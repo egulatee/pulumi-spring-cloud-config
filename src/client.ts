@@ -226,6 +226,33 @@ export class ConfigServerClient {
    * - HTTP 5xx except 503
    */
   private isRetryableError(error: unknown): boolean {
+    // Check if this is already a ConfigServerError (after sanitization)
+    if (error instanceof ConfigServerError) {
+      // HTTP 503 Service Unavailable
+      if (error.statusCode === 503) {
+        return true;
+      }
+
+      // Network errors (no status code)
+      if (!error.statusCode) {
+        // Check for network error indicators in the message
+        const networkErrorIndicators = [
+          'ECONNREFUSED',
+          'ETIMEDOUT',
+          'ENOTFOUND',
+          'ENETUNREACH',
+          'ECONNABORTED',
+          'ECONNRESET',
+          'Connection refused',
+          'Request timeout',
+          'Network error',
+        ];
+        return networkErrorIndicators.some((indicator) => error.message.includes(indicator));
+      }
+
+      return false;
+    }
+
     if (axios.isAxiosError(error)) {
       // Network errors without response
       if (!error.response) {
@@ -275,6 +302,9 @@ export class ConfigServerClient {
     let message: string;
     let statusCode: number | undefined;
 
+    // Remove any potential credentials from URLs before using in messages
+    const sanitizedBaseUrl = this.baseURL.replace(/:\/\/([^:]+):([^@]+)@/, '://***:***@');
+
     if (axios.isAxiosError(error)) {
       const axiosError = error as AxiosError;
       statusCode = axiosError.response?.status;
@@ -304,7 +334,7 @@ export class ConfigServerClient {
       } else if (axiosError.code === 'ECONNABORTED') {
         message = `Request timeout: Config server did not respond within timeout period`;
       } else if (axiosError.code === 'ECONNREFUSED') {
-        message = `Connection refused: Cannot connect to config server at ${this.baseURL}`;
+        message = `Connection refused: Cannot connect to config server at ${sanitizedBaseUrl}`;
       } else {
         message = `Network error: ${axiosError.message}`;
       }
@@ -314,10 +344,7 @@ export class ConfigServerClient {
       message = `Unknown error occurred while fetching configuration`;
     }
 
-    // Remove any potential credentials from URL
-    const sanitizedUrl = this.baseURL.replace(/:\/\/([^:]+):([^@]+)@/, '://***:***@');
-
-    return new ConfigServerError(message, statusCode, application, profile, sanitizedUrl + url);
+    return new ConfigServerError(message, statusCode, application, profile, sanitizedBaseUrl + url);
   }
 
   /**

@@ -53,23 +53,9 @@ export interface MockClientOptions {
  * ```
  */
 export function createMockClient(options: MockClientOptions = {}): ConfigServerClient {
-  const {
-    url = 'http://localhost:8888',
-    username,
-    password,
-    retryOptions,
-    timeout,
-    headers,
-  } = options;
+  const { url = 'http://localhost:8888', username, password, timeout = 10000 } = options;
 
-  return new ConfigServerClient({
-    baseURL: url,
-    username,
-    password,
-    retryOptions,
-    timeout,
-    headers,
-  });
+  return new ConfigServerClient(url, username, password, timeout, false);
 }
 
 /**
