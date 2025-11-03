@@ -2,7 +2,7 @@
 
 > Pulumi Dynamic Provider for integrating Spring Cloud Config Server with infrastructure-as-code projects
 
-[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](https://github.com/egulatee/pulumi-spring-cloud-config)
+[![npm version](https://img.shields.io/npm/v/@egulatee/pulumi-spring-cloud-config.svg?color=blue)](https://www.npmjs.com/package/@egulatee/pulumi-spring-cloud-config)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Test](https://github.com/egulatee/pulumi-spring-cloud-config/actions/workflows/test.yml/badge.svg)](https://github.com/egulatee/pulumi-spring-cloud-config/actions/workflows/test.yml)
 [![codecov](https://codecov.io/gh/egulatee/pulumi-spring-cloud-config/branch/main/graph/badge.svg)](https://codecov.io/gh/egulatee/pulumi-spring-cloud-config)
