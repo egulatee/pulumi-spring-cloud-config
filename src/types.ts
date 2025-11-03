@@ -78,12 +78,97 @@ export interface PropertySource {
 
 /**
  * Response from Spring Cloud Config Server
+ *
+ * @remarks Standard response format from Spring Cloud Config Server API
  */
 export interface ConfigServerResponse {
+  /**
+   * Application name
+   */
   name: string;
+
+  /**
+   * Active profiles
+   */
   profiles: string[];
+
+  /**
+   * Label/branch used
+   */
   label: string | null;
+
+  /**
+   * Version identifier (e.g., git commit hash)
+   */
   version: string | null;
+
+  /**
+   * State information
+   */
   state: string | null;
+
+  /**
+   * Array of property sources (ordered by precedence)
+   *
+   * @remarks Later sources override earlier ones
+   */
   propertySources: PropertySource[];
 }
+
+/**
+ * Retry configuration for HTTP requests with exponential backoff
+ *
+ * @example
+ * ```typescript
+ * const retryOptions: RetryOptions = {
+ *   maxRetries: 3,
+ *   retryDelay: 1000,
+ *   backoffMultiplier: 2
+ * };
+ * // Retry delays: 1000ms, 2000ms, 4000ms
+ * ```
+ */
+export interface RetryOptions {
+  /**
+   * Maximum number of retry attempts (default: 3)
+   *
+   * @default 3
+   * @remarks Only retries on transient errors (network, timeout, 503)
+   */
+  maxRetries?: number;
+
+  /**
+   * Initial retry delay in milliseconds (default: 1000)
+   *
+   * @default 1000
+   * @remarks Delay before first retry attempt
+   */
+  retryDelay?: number;
+
+  /**
+   * Backoff multiplier for exponential backoff (default: 2)
+   *
+   * @default 2
+   * @remarks Each retry delay is multiplied by this value
+   */
+  backoffMultiplier?: number;
+}
+
+/**
+ * Options for getProperty method
+ */
+export interface GetPropertyOptions {
+  /**
+   * Explicitly mark this property as a secret
+   *
+   * @default undefined (uses auto-detection if enabled)
+   */
+  markAsSecret?: boolean;
+}
+
+/**
+ * Patterns used to detect likely secrets in property keys
+ *
+ * @remarks These patterns are used when autoDetectSecrets is enabled
+ */
+export const SECRET_PATTERNS = /password|secret|token|.*key$|credential|auth|api[_-]?key/i;
