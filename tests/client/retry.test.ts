@@ -101,9 +101,9 @@ describe('ConfigServerClient - Retry Logic', () => {
       const path = '/my-app/prod';
 
       // First call times out
-      nock(baseUrl)
-        .get(path)
-        .replyWithError({ code: 'ECONNABORTED', message: 'timeout of 1000ms exceeded' });
+      const timeoutError = new Error('timeout of 1000ms exceeded');
+      (timeoutError as NodeJS.ErrnoException).code = 'ECONNABORTED';
+      nock(baseUrl).get(path).replyWithError(timeoutError);
       // Second call succeeds
       mockNock(baseUrl, path, smallConfigResponse, 200);
 

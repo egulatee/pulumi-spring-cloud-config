@@ -246,9 +246,9 @@ export function mockNock(
  * ```
  */
 export function mockNockNetworkError(baseUrl: string, path: string, errorCode: string): nock.Scope {
-  return nock(baseUrl)
-    .get(path)
-    .replyWithError({ code: errorCode, message: `Network error: ${errorCode}` });
+  const error = new Error(`Network error: ${errorCode}`);
+  (error as NodeJS.ErrnoException).code = errorCode;
+  return nock(baseUrl).get(path).replyWithError(error);
 }
 
 /**
