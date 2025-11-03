@@ -52,13 +52,6 @@ export class ConfigServerConfig extends pulumi.dynamic.Resource {
   public readonly properties!: pulumi.Output<Record<string, unknown>>;
 
   /**
-   * Internal state fields for filtering and source tracking
-   * @private
-   */
-  private readonly propertySourceNames!: pulumi.Output<string[]>;
-  private readonly propertySourceMap!: pulumi.Output<Record<string, Record<string, unknown>>>;
-
-  /**
    * Whether automatic secret detection is enabled
    *
    * @private
@@ -152,9 +145,17 @@ export class ConfigServerConfig extends pulumi.dynamic.Resource {
    * ```
    */
   getSourceProperties(sourceNames?: string[]): pulumi.Output<Record<string, unknown>> {
-    return pulumi
-      .all([this.propertySourceNames, this.propertySourceMap])
-      .apply(([names, sourceMap]) => {
+    // Access the outputs from the resource state without using private Output fields
+    // This avoids the Pulumi serialization race condition with Jest teardown
+    const resourceOutput = pulumi.output(this);
+
+    return resourceOutput.apply(
+      (resource: {
+        propertySourceNames?: string[];
+        propertySourceMap?: Record<string, Record<string, unknown>>;
+      }) => {
+        const names: string[] = resource.propertySourceNames ?? [];
+        const sourceMap: Record<string, Record<string, unknown>> = resource.propertySourceMap ?? {};
         const result: Record<string, unknown> = {};
 
         // Guard against undefined/null names
@@ -175,7 +176,8 @@ export class ConfigServerConfig extends pulumi.dynamic.Resource {
         }
 
         return result;
-      });
+      }
+    );
   }
 
   /**
