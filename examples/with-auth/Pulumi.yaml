@@ -1,0 +1,6 @@
+name: with-auth-example
+runtime:
+  name: nodejs
+  options:
+    typescript: true
+description: Example demonstrating authentication and security best practices with Spring Cloud Config Server

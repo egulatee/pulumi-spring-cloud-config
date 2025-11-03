@@ -1,0 +1,22 @@
+# Base configuration for multi-env-app example
+# Common properties shared across all environments
+
+spring:
+  application:
+    name: "multi-env-app"
+
+app:
+  title: "Multi-Environment Application"
+  description: "Demonstrates environment-specific configuration using Pulumi stacks"
+  version: "2.0.0"
+
+logging:
+  pattern: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+
+monitoring:
+  enabled: true
+  provider: "cloudwatch"
+
+features:
+  enableMetrics: true
+  enableHealthCheck: true

@@ -1,0 +1,26 @@
+# Configuration for basic-app example
+# Demonstrates simple property fetching
+
+spring:
+  application:
+    name: "basic-app"
+
+server:
+  port: 8080
+  shutdown: graceful
+
+database:
+  host: "localhost"
+  port: 5432
+  name: "basic_db"
+  maxConnections: 20
+
+features:
+  enableCache: true
+  enableMetrics: true
+  enableTracing: false
+
+app:
+  title: "Basic Application"
+  description: "Demonstrates basic Spring Cloud Config integration with Pulumi"
+  contactEmail: "support@example.com"

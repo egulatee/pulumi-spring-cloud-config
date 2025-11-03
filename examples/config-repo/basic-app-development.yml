@@ -1,0 +1,17 @@
+# Profile-specific configuration for basic-app (development profile)
+# Overrides and extends base basic-app.yml
+
+database:
+  host: "dev-db.example.com"
+  name: "basic_db_dev"
+
+features:
+  enableTracing: true
+
+app:
+  environment: "development"
+
+logging:
+  level:
+    root: DEBUG
+    com.example: DEBUG

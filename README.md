@@ -265,6 +265,115 @@ const config = new ConfigServerConfig('slow-config', {
 });
 ```
 
+## Architecture
+
+### How It Works
+
+```
+┌─────────────────┐
+│ Pulumi Program  │
+│                 │
+│ ConfigServer    │
+│ Config(...)     │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────────────┐
+│ Dynamic Provider        │
+│ - Validates inputs      │
+│ - Fetches config        │
+│ - Detects secrets       │
+│ - Smart diffing         │
+└────────┬────────────────┘
+         │
+         ▼
+┌─────────────────────────┐
+│ HTTP Client             │
+│ - Basic Auth            │
+│ - Retry logic           │
+│ - Error handling        │
+└────────┬────────────────┘
+         │
+         ▼
+┌─────────────────────────────┐
+│ Spring Cloud Config Server  │
+│ ┌─────────────────────────┐ │
+│ │ Property Sources:       │ │
+│ │ • Git Repository        │ │
+│ │ • HashiCorp Vault       │ │
+│ │ • Local Files           │ │
+│ │ • Environment Variables │ │
+│ └─────────────────────────┘ │
+└─────────────────────────────┘
+```
+
+For a detailed architecture diagram, see [docs/architecture.txt](./docs/architecture.txt).
+
+**Key Components:**
+
+1. **ConfigServerConfig Resource** - User-facing API that creates a Pulumi resource
+2. **Dynamic Provider** - Manages resource lifecycle (create, update, diff)
+3. **HTTP Client** - Handles communication with config server (retry, auth, errors)
+4. **Config Server** - External service that aggregates configuration from multiple sources
+
+**Data Flow:**
+
+1. Pulumi program creates ConfigServerConfig resource
+2. Dynamic provider fetches configuration from config server
+3. Provider flattens property sources and detects secrets
+4. Properties are available via `getProperty()` and `getSourceProperties()`
+5. Smart diffing ensures configuration is only re-fetched when inputs change
+
+## Error Handling
+
+The provider handles various error scenarios gracefully:
+
+### HTTP Errors
+
+| Status Code | Behavior | Retry? |
+|-------------|----------|--------|
+| **401** | Authentication failed - check username/password | ❌ No |
+| **403** | Access forbidden - insufficient permissions | ❌ No |
+| **404** | Configuration not found for application/profile | ❌ No |
+| **500** | Config server internal error | ❌ No |
+| **503** | Service unavailable | ✅ Yes (up to 3 times) |
+
+### Network Errors
+
+| Error Type | Description | Retry? |
+|------------|-------------|--------|
+| **ECONNREFUSED** | Cannot connect to config server | ✅ Yes |
+| **ETIMEDOUT** | Request timeout | ✅ Yes |
+| **ECONNABORTED** | Connection aborted | ✅ Yes |
+| **ENOTFOUND** | DNS resolution failed | ✅ Yes |
+
+### Retry Logic
+
+- **Max Retries**: 3 (configurable)
+- **Initial Delay**: 1000ms
+- **Backoff Strategy**: Exponential (2x multiplier)
+- **Total Max Time**: ~7 seconds (1s + 2s + 4s)
+
+**Example with retries:**
+
+```typescript
+const config = new ConfigServerConfig('config', {
+  configServerUrl: 'https://config-server.example.com',
+  application: 'my-app',
+  profile: 'prod',
+  timeout: 15000, // Allow more time for retries
+});
+```
+
+### Error Messages
+
+All error messages are sanitized to remove credentials:
+
+```
+❌ Bad:  "Failed to connect to https://user:password@config-server.example.com"
+✅ Good: "Failed to connect to https://***:***@config-server.example.com"
+```
+
 ## API Reference
 
 ### ConfigServerConfig
@@ -275,6 +384,38 @@ const config = new ConfigServerConfig('slow-config', {
 new ConfigServerConfig(name: string, args: ConfigServerConfigArgs, opts?: pulumi.CustomResourceOptions)
 ```
 
+**Parameters:**
+- `name` - Unique name for this resource
+- `args` - Configuration arguments (see [Configuration Options](#configuration-options))
+- `opts` - Optional Pulumi resource options
+
+#### Properties
+
+##### config: pulumi.Output<ConfigServerResponse>
+
+The full configuration response from the config server.
+
+**Type Definition:**
+```typescript
+interface ConfigServerResponse {
+  name: string;                    // Application name
+  profiles: string[];              // Active profiles
+  label: string | null;            // Git label/branch
+  version: string | null;          // Git commit hash
+  state: string | null;            // State information
+  propertySources: PropertySource[]; // Array of property sources
+}
+
+interface PropertySource {
+  name: string;                    // Source identifier (e.g., "vault:/secret/app/prod")
+  source: Record<string, unknown>; // Key-value properties
+}
+```
+
+##### properties: pulumi.Output<Record<string, unknown>>
+
+All configuration properties flattened into a single key-value map. Later sources override earlier ones.
+
 #### Methods
 
 ##### getProperty(key: string, markAsSecret?: boolean): pulumi.Output<string | undefined>
@@ -282,27 +423,253 @@ new ConfigServerConfig(name: string, args: ConfigServerConfigArgs, opts?: pulumi
 Get a single property value from the configuration.
 
 **Parameters:**
-- `key`: The property key (e.g., `"database.password"`)
-- `markAsSecret`: Whether to mark this property as a Pulumi secret (default: `false`)
+- `key` - The property key using dot notation (e.g., `"database.password"`)
+- `markAsSecret` (optional) - Override automatic secret detection:
+  - `true` - Force mark as secret
+  - `false` - Prevent marking as secret
+  - `undefined` - Use automatic detection (default)
 
-**Returns:** The property value as a Pulumi Output
+**Returns:** `pulumi.Output<string | undefined>` - The property value, or `undefined` if not found
+
+**Examples:**
+```typescript
+// Auto-detect secrets
+const dbPassword = config.getProperty("database.password");  // Marked as secret
+
+// Force mark as secret
+const apiKey = config.getProperty("api.endpoint", true);
+
+// Prevent marking as secret
+const publicKey = config.getProperty("rsa.publicKey", false);
+```
 
 ##### getSourceProperties(sourceNames?: string[]): pulumi.Output<Record<string, unknown>>
 
-Get all properties from specific property sources.
+Get properties from specific property sources.
 
 **Parameters:**
-- `sourceNames`: Filter by source names (e.g., `["vault"]`). If not provided, returns all properties.
+- `sourceNames` (optional) - Array of source name filters (case-insensitive substring match)
+  - If provided: Returns only properties from matching sources
+  - If omitted: Returns all properties from all sources
 
-**Returns:** All properties from matching sources
+**Returns:** `pulumi.Output<Record<string, unknown>>` - Filtered properties map
+
+**Examples:**
+```typescript
+// Get all Vault properties
+const vaultProps = config.getSourceProperties(["vault"]);
+
+// Get properties from Vault OR Git sources
+const vaultOrGit = config.getSourceProperties(["vault", "git"]);
+
+// Get all properties (same as config.properties)
+const allProps = config.getSourceProperties();
+```
+
+**Source Name Matching:**
+- Source: `vault:/secret/app/prod` → Matches filter: `["vault"]` ✅
+- Source: `git:https://github.com/org/config` → Matches filter: `["git"]` ✅
+- Source: `file:///config/application.yml` → Matches filter: `["vault"]` ❌
+
+##### getAllSecrets(): pulumi.Output<Record<string, string>>
+
+Get all properties that were automatically detected as secrets.
+
+**Returns:** `pulumi.Output<Record<string, string>>` - All auto-detected secrets
+
+**Note:** Only works if `autoDetectSecrets: true` (default). Returns empty object if disabled.
+
+**Secret Detection Pattern:**
+```
+/password|secret|token|.*key$|credential|auth|api[_-]?key/i
+```
+
+**Examples:**
+```typescript
+const secrets = config.getAllSecrets();
+
+// Use with AWS Secrets Manager
+secrets.apply(secretMap => {
+  for (const [key, value] of Object.entries(secretMap)) {
+    new aws.secretsmanager.Secret(`${key}`, {
+      secretString: value,
+    });
+  }
+});
+```
+
+## Migration Guide
+
+### Migrating from Manual Config Fetching
+
+If you're currently using custom HTTP client code to fetch configuration from Spring Cloud Config Server, here's how to migrate:
+
+#### Before (Manual Approach)
+
+```typescript
+import * as pulumi from '@pulumi/pulumi';
+import axios from 'axios';
+
+// Manually fetch configuration
+async function getConfig() {
+  const response = await axios.get(
+    'https://config-server.example.com/my-app/prod',
+    {
+      auth: {
+        username: 'admin',
+        password: 'secret',
+      },
+    }
+  );
+
+  // Manually flatten properties
+  const props: Record<string, any> = {};
+  for (const source of response.data.propertySources) {
+    Object.assign(props, source.source);
+  }
+
+  return props;
+}
+
+// Use in Pulumi program (problematic!)
+const configPromise = getConfig();
+export const dbPassword = configPromise.then(c => c['database.password']);
+```
+
+**Problems with this approach:**
+- ❌ Async/await doesn't work well with Pulumi Outputs
+- ❌ No automatic secret detection
+- ❌ No retry logic
+- ❌ No smart diffing (fetches on every `pulumi up`)
+- ❌ Credentials exposed in code or environment variables
+- ❌ Error handling is manual
+
+#### After (Using This Package)
+
+```typescript
+import * as pulumi from '@pulumi/pulumi';
+import { ConfigServerConfig } from '@egulatee/pulumi-spring-cloud-config';
+
+const pulumiConfig = new pulumi.Config();
+
+const config = new ConfigServerConfig('config', {
+  configServerUrl: 'https://config-server.example.com',
+  application: 'my-app',
+  profile: 'prod',
+  username: pulumiConfig.require('configServerUsername'),
+  password: pulumiConfig.requireSecret('configServerPassword'),
+});
+
+// Access properties with proper Pulumi Output handling
+export const dbPassword = config.getProperty('database.password');
+```
+
+**Benefits:**
+- ✅ Proper Pulumi Output handling
+- ✅ Automatic secret detection and encryption
+- ✅ Built-in retry logic with exponential backoff
+- ✅ Smart diffing (only fetches when needed)
+- ✅ Credentials stored securely in Pulumi config
+- ✅ Comprehensive error handling
+
+### Step-by-Step Migration
+
+**1. Install the package:**
+
+```bash
+npm install @egulatee/pulumi-spring-cloud-config
+```
+
+**2. Replace manual HTTP calls with ConfigServerConfig:**
+
+```typescript
+// Remove
+import axios from 'axios';
+
+// Add
+import { ConfigServerConfig } from '@egulatee/pulumi-spring-cloud-config';
+```
+
+**3. Store credentials in Pulumi config:**
+
+```bash
+pulumi config set configServerUsername admin
+pulumi config set --secret configServerPassword your-password
+```
+
+**4. Replace config fetching logic:**
+
+```typescript
+// Remove manual fetching
+const configData = await axios.get(...);
+
+// Add resource
+const config = new ConfigServerConfig('config', {
+  configServerUrl: 'https://config-server.example.com',
+  application: 'my-app',
+  profile: pulumi.getStack(),
+  username: pulumiConfig.require('configServerUsername'),
+  password: pulumiConfig.requireSecret('configServerPassword'),
+});
+```
+
+**5. Update property access:**
+
+```typescript
+// Replace direct property access
+const dbHost = configData.properties['database.host'];
+
+// With getProperty()
+const dbHost = config.getProperty('database.host');
+```
+
+**6. Test the migration:**
+
+```bash
+pulumi preview
+pulumi up
+```
 
 ## Examples
 
-See the [examples](./examples) directory for complete examples:
+See the [examples](./examples) directory for complete, runnable examples:
 
-- [Basic Usage](./examples/basic/) - Simple configuration fetch
-- [With Authentication](./examples/with-auth/) - Using Basic Auth
-- [Vault Only](./examples/vault-only/) - Filtering to Vault property sources
+1. **[Basic Usage](./examples/basic/)** - Simple configuration fetch
+   - Minimal working example
+   - Property access and Output unwrapping
+   - Introduction to the package
+
+2. **[With Authentication](./examples/with-auth/)** - Security best practices
+   - Basic Auth with username/password
+   - Secure credential storage using Pulumi Config
+   - Secret handling and detection
+   - Production-ready patterns
+
+3. **[Vault-Only Configuration](./examples/vault-only/)** - Property source filtering
+   - Filter properties by source (simulating Vault)
+   - `getSourceProperties()` usage
+   - `getAllSecrets()` demonstration
+   - Real-world Vault integration patterns
+
+4. **[Complete AWS Infrastructure](./examples/complete/)** - Real-world deployment
+   - Fully deployable AWS stack (VPC, RDS, ECS, ALB)
+   - Using config server values with AWS resources
+   - Secrets Manager integration
+   - Production architecture
+
+5. **[Multi-Environment](./examples/multi-environment/)** - Stack-based environments
+   - Managing dev/staging/prod with Pulumi stacks
+   - Dynamic profile selection
+   - Environment-specific configuration
+   - CI/CD integration patterns
+
+All examples include:
+- Complete, working Pulumi programs
+- Detailed README with setup instructions
+- Docker Compose test infrastructure
+- Real configuration files
+
+See [examples/README.md](./examples/README.md) for quick start instructions.
 
 ## Development
 

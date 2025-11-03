@@ -1,0 +1,36 @@
+# Development environment configuration
+# These properties override base configuration for development
+
+app:
+  environment: "development"
+
+server:
+  port: 3000
+
+database:
+  host: "dev-db.local"
+  port: 5432
+  name: "multi_env_dev"
+  username: "dev_user"
+  password: "dev-password-123"  # Auto-detected as secret
+  maxConnections: 10
+
+api:
+  external:
+    endpoint: "https://api-dev.example.com"
+    apiKey: "dev-api-key-123"  # Auto-detected as secret
+    timeout: 60000
+
+logging:
+  level:
+    root: "DEBUG"
+    com.example: "TRACE"
+
+features:
+  enableDebugMode: true
+  enableHotReload: true
+  enableMockData: true
+
+aws:
+  region: "us-east-1"
+  accountId: "123456789012"

@@ -1,0 +1,41 @@
+# Staging environment configuration
+# These properties override base configuration for staging
+
+app:
+  environment: "staging"
+
+server:
+  port: 8080
+
+database:
+  host: "staging-db.example.com"
+  port: 5432
+  name: "multi_env_staging"
+  username: "staging_user"
+  password: "staging-password-456"  # Auto-detected as secret
+  maxConnections: 25
+
+api:
+  external:
+    endpoint: "https://api-staging.example.com"
+    apiKey: "staging-api-key-456"  # Auto-detected as secret
+    timeout: 30000
+
+logging:
+  level:
+    root: "INFO"
+    com.example: "DEBUG"
+
+features:
+  enableDebugMode: false
+  enableHotReload: false
+  enableMockData: false
+  enablePerformanceMonitoring: true
+
+aws:
+  region: "us-east-1"
+  accountId: "123456789012"
+
+cache:
+  enabled: true
+  ttl: 300

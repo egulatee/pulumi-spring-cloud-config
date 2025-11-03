@@ -1,0 +1,21 @@
+# Default application configuration
+# These properties are available to all applications
+
+common:
+  greeting: "Hello from Spring Cloud Config Server"
+  version: "1.0.0"
+  environment: "development"
+
+logging:
+  level:
+    root: INFO
+    org.springframework: INFO
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "health,info,metrics"
+  endpoint:
+    health:
+      show-details: always

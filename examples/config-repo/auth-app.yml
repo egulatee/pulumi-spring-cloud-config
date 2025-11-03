@@ -1,0 +1,41 @@
+# Configuration for auth-app example
+# Demonstrates authentication and secret handling
+
+spring:
+  application:
+    name: "auth-app"
+
+server:
+  port: 8443
+  ssl:
+    enabled: true
+
+database:
+  host: "secure-db.example.com"
+  port: 5432
+  name: "auth_db"
+  username: "app_user"
+  password: "super-secret-db-password"  # Auto-detected as secret
+  maxConnections: 50
+
+security:
+  jwt:
+    secret: "jwt-signing-secret-key-do-not-share"  # Auto-detected as secret
+    expirationMs: 3600000
+
+api:
+  external:
+    endpoint: "https://api.example.com"
+    apiKey: "ak_live_1234567890abcdef"  # Auto-detected as secret
+    timeout: 30000
+
+encryption:
+  key: "encryption-master-key-aes256"  # Auto-detected as secret
+
+features:
+  enableSecurity: true
+  enableAudit: true
+
+app:
+  title: "Authenticated Application"
+  description: "Demonstrates secure configuration with authentication"
