@@ -80,7 +80,10 @@ describe('ConfigServerProvider - Lifecycle', () => {
         label: 'v1.0.0',
         username: 'user',
         password: 'pass',
-        config: expect.any(Object),
+        configName: expect.any(String),
+        configProfiles: expect.any(Array),
+        propertySourceNames: expect.any(Array),
+        propertySourceMap: expect.any(Object),
         properties: expect.any(Object),
       });
     });
@@ -97,8 +100,8 @@ describe('ConfigServerProvider - Lifecycle', () => {
 
       const result = await provider.create(inputs);
 
-      expect(result.outs.config.propertySources).toHaveLength(1);
-      expect(result.outs.config.propertySources[0].name).toContain('vault');
+      expect(result.outs.propertySourceNames).toHaveLength(1);
+      expect(result.outs.propertySourceNames[0]).toContain('vault');
     });
 
     it('should create with no property sources (empty config)', async () => {
@@ -112,7 +115,7 @@ describe('ConfigServerProvider - Lifecycle', () => {
 
       const result = await provider.create(inputs);
 
-      expect(result.outs.config.propertySources).toHaveLength(0);
+      expect(result.outs.propertySourceNames).toHaveLength(0);
       expect(result.outs.properties).toEqual({});
     });
 
@@ -169,9 +172,9 @@ describe('ConfigServerProvider - Lifecycle', () => {
       const result = await provider.create(inputs);
 
       // Verify outputs match fetched config
-      expect(result.outs.config.name).toBe(smallConfigResponse.name);
-      expect(result.outs.config.profiles).toEqual(smallConfigResponse.profiles);
-      expect(result.outs.config.propertySources).toEqual(smallConfigResponse.propertySources);
+      expect(result.outs.configName).toBe(smallConfigResponse.name);
+      expect(result.outs.configProfiles).toEqual(smallConfigResponse.profiles);
+      expect(result.outs.propertySourceNames).toEqual(['vault:secret/application/dev']);
       expect(result.outs.properties).toEqual(smallConfigResponse.propertySources[0].source);
     });
   });
@@ -189,8 +192,15 @@ describe('ConfigServerProvider - Lifecycle', () => {
       debug: false,
       autoDetectSecrets: true,
       enforceHttps: false,
-      config: smallConfigResponse,
-      properties: {},
+      configName: smallConfigResponse.name,
+      configProfiles: smallConfigResponse.profiles,
+      configLabel: smallConfigResponse.label,
+      configVersion: smallConfigResponse.version,
+      propertySourceNames: ['vault:secret/application/dev'],
+      propertySourceMap: {
+        'vault:secret/application/dev': smallConfigResponse.propertySources[0].source,
+      },
+      properties: smallConfigResponse.propertySources[0].source,
     };
 
     it('should detect application name change', async () => {
@@ -264,7 +274,14 @@ describe('ConfigServerProvider - Lifecycle', () => {
         configServerUrl: 'http://localhost:8888',
         application: 'test-app',
         profile: 'dev',
-        config: smallConfigResponse,
+        configName: smallConfigResponse.name,
+        configProfiles: smallConfigResponse.profiles,
+        configLabel: smallConfigResponse.label,
+        configVersion: smallConfigResponse.version,
+        propertySourceNames: ['vault:secret/application/dev'],
+        propertySourceMap: {
+          'vault:secret/application/dev': smallConfigResponse.propertySources[0].source,
+        },
         properties: {},
       };
 
@@ -277,7 +294,7 @@ describe('ConfigServerProvider - Lifecycle', () => {
       const result = await provider.update('test-app-dev', oldOutputs, newInputs);
 
       expect(mockFetchConfigWithRetry).toHaveBeenCalled();
-      expect(result.outs.config.name).toBe('updated-app');
+      expect(result.outs.configName).toBe('updated-app');
     });
 
     it('should return new outputs after update', async () => {
@@ -287,7 +304,14 @@ describe('ConfigServerProvider - Lifecycle', () => {
         configServerUrl: 'http://localhost:8888',
         application: 'test-app',
         profile: 'dev',
-        config: smallConfigResponse,
+        configName: smallConfigResponse.name,
+        configProfiles: smallConfigResponse.profiles,
+        configLabel: smallConfigResponse.label,
+        configVersion: smallConfigResponse.version,
+        propertySourceNames: ['vault:secret/application/dev'],
+        propertySourceMap: {
+          'vault:secret/application/dev': smallConfigResponse.propertySources[0].source,
+        },
         properties: {},
       };
 
@@ -311,7 +335,14 @@ describe('ConfigServerProvider - Lifecycle', () => {
         configServerUrl: 'http://localhost:8888',
         application: 'test-app',
         profile: 'dev',
-        config: smallConfigResponse,
+        configName: smallConfigResponse.name,
+        configProfiles: smallConfigResponse.profiles,
+        configLabel: smallConfigResponse.label,
+        configVersion: smallConfigResponse.version,
+        propertySourceNames: ['vault:secret/application/dev'],
+        propertySourceMap: {
+          'vault:secret/application/dev': smallConfigResponse.propertySources[0].source,
+        },
         properties: {},
       };
 

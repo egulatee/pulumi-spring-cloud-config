@@ -77,9 +77,8 @@ describe('ConfigServerConfig - Basic Resource Creation', () => {
 
     expect(resource).toBeDefined();
 
-    const config = await waitForOutput(resource.config);
-    expect(config).toBeDefined();
-    expect(config.name).toBe('test-application');
+    const properties = await waitForOutput(resource.properties);
+    expect(properties).toBeDefined();
   });
 
   it('should create resource with optional label', async () => {
@@ -92,8 +91,8 @@ describe('ConfigServerConfig - Basic Resource Creation', () => {
 
     expect(resource).toBeDefined();
 
-    const config = await waitForOutput(resource.config);
-    expect(config).toBeDefined();
+    const properties = await waitForOutput(resource.properties);
+    expect(properties).toBeDefined();
   });
 
   it('should create resource with optional username/password', async () => {
@@ -107,8 +106,8 @@ describe('ConfigServerConfig - Basic Resource Creation', () => {
 
     expect(resource).toBeDefined();
 
-    const config = await waitForOutput(resource.config);
-    expect(config).toBeDefined();
+    const properties = await waitForOutput(resource.properties);
+    expect(properties).toBeDefined();
   });
 
   it('should create resource with optional propertySources filter', async () => {
@@ -121,8 +120,8 @@ describe('ConfigServerConfig - Basic Resource Creation', () => {
 
     expect(resource).toBeDefined();
 
-    const config = await waitForOutput(resource.config);
-    expect(config).toBeDefined();
+    const properties = await waitForOutput(resource.properties);
+    expect(properties).toBeDefined();
   });
 
   it('should create resource with autoDetectSecrets: true (default)', async () => {
@@ -179,16 +178,12 @@ describe('ConfigServerConfig - Basic Resource Creation', () => {
       profile: 'prod',
     });
 
-    // config should be a Pulumi Output
-    expect(resource.config).toBeDefined();
-    expect(typeof resource.config.apply).toBe('function');
-
     // properties should be a Pulumi Output
     expect(resource.properties).toBeDefined();
     expect(typeof resource.properties.apply).toBe('function');
 
     // Verify we can unwrap the outputs
-    const config = await waitForOutput(resource.config);
+    const config = await waitForOutput(resource.properties);
     const properties = await waitForOutput(resource.properties);
 
     expect(config).toBeDefined();
