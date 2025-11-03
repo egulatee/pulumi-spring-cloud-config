@@ -125,8 +125,13 @@ describe('ConfigServerClient - Authentication', () => {
 
       mockNock(baseUrl, path, { error: 'Unauthorized' }, 401);
 
-      await expect(client.fetchConfig('my-app', 'prod')).rejects.toThrow(ConfigServerError);
-      await expect(client.fetchConfig('my-app', 'prod')).rejects.toThrow('Authentication failed');
+      try {
+        await client.fetchConfig('my-app', 'prod');
+        fail('Should have thrown an error');
+      } catch (error) {
+        expect(error).toBeInstanceOf(ConfigServerError);
+        expect((error as Error).message).toContain('Authentication failed');
+      }
     });
 
     it('should handle 403 Forbidden (insufficient permissions)', async () => {
@@ -135,8 +140,13 @@ describe('ConfigServerClient - Authentication', () => {
 
       mockNock(baseUrl, path, { error: 'Forbidden' }, 403);
 
-      await expect(client.fetchConfig('my-app', 'prod')).rejects.toThrow(ConfigServerError);
-      await expect(client.fetchConfig('my-app', 'prod')).rejects.toThrow('Access forbidden');
+      try {
+        await client.fetchConfig('my-app', 'prod');
+        fail('Should have thrown an error');
+      } catch (error) {
+        expect(error).toBeInstanceOf(ConfigServerError);
+        expect((error as Error).message).toContain('Access forbidden');
+      }
     });
   });
 
@@ -154,11 +164,14 @@ describe('ConfigServerClient - Authentication', () => {
         fail('Should have thrown an error');
       } catch (error) {
         expect(error).toBeInstanceOf(ConfigServerError);
-        const errorMessage = (error as Error).message;
-        // Credentials should be sanitized in the URL
-        expect(errorMessage).not.toContain('testuser');
-        expect(errorMessage).not.toContain('testpass');
-        expect(errorMessage).toContain('***:***');
+        const configError = error as ConfigServerError;
+        // Credentials should not appear in error message or URL property
+        expect(configError.message).not.toContain('testuser');
+        expect(configError.message).not.toContain('testpass');
+        // URL property should have sanitized credentials
+        expect(configError.url).toContain('***:***');
+        expect(configError.url).not.toContain('testuser');
+        expect(configError.url).not.toContain('testpass');
       }
     });
 
@@ -208,10 +221,13 @@ describe('ConfigServerClient - Authentication', () => {
         await client.fetchConfig('my-app', 'prod');
         fail('Should have thrown an error');
       } catch (error) {
-        const errorMessage = (error as Error).message;
-        expect(errorMessage).toContain('***:***');
-        expect(errorMessage).not.toContain('user1');
-        expect(errorMessage).not.toContain('pass1');
+        const configError = error as ConfigServerError;
+        // Credentials should not leak in message or URL property
+        expect(configError.message).not.toContain('user1');
+        expect(configError.message).not.toContain('pass1');
+        expect(configError.url).toContain('***:***');
+        expect(configError.url).not.toContain('user1');
+        expect(configError.url).not.toContain('pass1');
       }
     });
 
@@ -228,10 +244,11 @@ describe('ConfigServerClient - Authentication', () => {
         await client.fetchConfig('my-app', 'prod');
         fail('Should have thrown an error');
       } catch (error) {
-        const errorMessage = (error as Error).message;
-        expect(errorMessage).toContain('***:***');
-        expect(errorMessage).not.toContain('user2');
-        expect(errorMessage).not.toContain('pass2');
+        const configError = error as ConfigServerError;
+        // Network error messages include the base URL, should be sanitized
+        expect(configError.message).toContain('***:***');
+        expect(configError.message).not.toContain('user2');
+        expect(configError.message).not.toContain('pass2');
       }
     });
   });
