@@ -236,9 +236,9 @@ describe('ConfigServerClient - Authentication', () => {
       const client = new ConfigServerClient(urlWithCreds);
       const path = '/my-app/prod';
 
-      nock(urlWithCreds)
-        .get(path)
-        .replyWithError({ code: 'ECONNREFUSED', message: 'Connection refused' });
+      const networkError = new Error('Connection refused');
+      (networkError as NodeJS.ErrnoException).code = 'ECONNREFUSED';
+      nock(urlWithCreds).get(path).replyWithError(networkError);
 
       try {
         await client.fetchConfig('my-app', 'prod');
