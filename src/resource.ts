@@ -2,7 +2,7 @@
 // This is the public API that users will interact with
 
 import * as pulumi from '@pulumi/pulumi';
-import { ConfigServerProvider, ConfigServerProviderState } from './provider';
+import { ConfigServerProvider } from './provider';
 import { ConfigServerConfigArgs, SECRET_PATTERNS } from './types';
 
 /**
@@ -43,11 +43,6 @@ import { ConfigServerConfigArgs, SECRET_PATTERNS } from './types';
  */
 export class ConfigServerConfig extends pulumi.dynamic.Resource {
   /**
-   * The full configuration response from the config server
-   */
-  public readonly config!: pulumi.Output<ConfigServerProviderState['config']>;
-
-  /**
    * All flattened configuration properties
    *
    * @remarks
@@ -55,6 +50,13 @@ export class ConfigServerConfig extends pulumi.dynamic.Resource {
    * Later sources override earlier ones.
    */
   public readonly properties!: pulumi.Output<Record<string, unknown>>;
+
+  /**
+   * Internal state fields for filtering and source tracking
+   * @private
+   */
+  private readonly propertySourceNames!: pulumi.Output<string[]>;
+  private readonly propertySourceMap!: pulumi.Output<Record<string, Record<string, unknown>>>;
 
   /**
    * Whether automatic secret detection is enabled
@@ -119,13 +121,9 @@ export class ConfigServerConfig extends pulumi.dynamic.Resource {
     // Determine if should mark as secret
     const shouldMarkSecret = markAsSecret ?? (this.autoDetectSecrets && this.isLikelySecret(key));
 
-    const value = this.config.apply((config) => {
-      for (const source of config.propertySources) {
-        if (key in source.source) {
-          return String(source.source[key]);
-        }
-      }
-      return undefined;
+    // Access property directly from the flattened properties map
+    const value = this.properties.apply((props) => {
+      return key in props ? String(props[key]) : undefined;
     });
 
     return shouldMarkSecret ? pulumi.secret(value) : value;
@@ -154,19 +152,30 @@ export class ConfigServerConfig extends pulumi.dynamic.Resource {
    * ```
    */
   getSourceProperties(sourceNames?: string[]): pulumi.Output<Record<string, unknown>> {
-    return this.config.apply((config) => {
-      const result: Record<string, unknown> = {};
+    return pulumi
+      .all([this.propertySourceNames, this.propertySourceMap])
+      .apply(([names, sourceMap]) => {
+        const result: Record<string, unknown> = {};
 
-      const sources = sourceNames
-        ? config.propertySources.filter((ps) => sourceNames.some((name) => ps.name.includes(name)))
-        : config.propertySources;
+        // Guard against undefined/null names
+        if (!names || !sourceMap) {
+          return result;
+        }
 
-      for (const source of sources) {
-        Object.assign(result, source.source);
-      }
+        // Filter source names if specified
+        const filteredNames = sourceNames
+          ? names.filter((name) => sourceNames.some((filter) => name.includes(filter)))
+          : names;
 
-      return result;
-    });
+        // Merge properties from filtered sources in order
+        for (const name of filteredNames) {
+          if (sourceMap[name]) {
+            Object.assign(result, sourceMap[name]);
+          }
+        }
+
+        return result;
+      });
   }
 
   /**
@@ -204,14 +213,12 @@ export class ConfigServerConfig extends pulumi.dynamic.Resource {
       return pulumi.output({} as Record<string, string>);
     }
 
-    const secrets = this.config.apply((config) => {
+    const secrets = this.properties.apply((props) => {
       const detected: Record<string, string> = {};
 
-      for (const source of config.propertySources) {
-        for (const [key, value] of Object.entries(source.source)) {
-          if (this.isLikelySecret(key)) {
-            detected[key] = String(value);
-          }
+      for (const [key, value] of Object.entries(props)) {
+        if (this.isLikelySecret(key)) {
+          detected[key] = String(value);
         }
       }
 

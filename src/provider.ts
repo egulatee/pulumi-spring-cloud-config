@@ -3,12 +3,25 @@
 
 import * as pulumi from '@pulumi/pulumi';
 import { ConfigServerClient } from './client';
-import { ConfigServerConfigArgs, ConfigServerResponse, PropertySource } from './types';
+import { ConfigServerConfigArgs, PropertySource } from './types';
 
 /**
  * Provider state stored by Pulumi
  *
- * @remarks This state is persisted by Pulumi and used for change detection
+ * @remarks
+ * This state is persisted by Pulumi and used for change detection.
+ * The state uses a serialization-friendly structure to avoid Pulumi's
+ * "Unexpected struct type" error that occurs with complex nested objects.
+ *
+ * Instead of storing the full ConfigServerResponse (with nested propertySources),
+ * we store:
+ * - propertySourceNames: Ordered list of source names (for filtering/ordering)
+ * - propertySourceMap: Map of source name to its properties (for reconstruction)
+ * - properties: Flattened key-value map (for easy access)
+ * - Metadata: config name, profiles, label, version (for reference)
+ *
+ * This allows us to reconstruct the config structure when needed while
+ * keeping the persisted state flat and serializable.
  */
 export interface ConfigServerProviderState {
   configServerUrl: string;
@@ -22,7 +35,13 @@ export interface ConfigServerProviderState {
   debug?: boolean;
   autoDetectSecrets?: boolean;
   enforceHttps?: boolean;
-  config: ConfigServerResponse;
+  // Serialization-friendly config data
+  configName: string;
+  configProfiles: string[];
+  configLabel: string | null;
+  configVersion: string | null;
+  propertySourceNames: string[];
+  propertySourceMap: Record<string, Record<string, unknown>>;
   properties: Record<string, unknown>;
 }
 
@@ -110,13 +129,22 @@ export class ConfigServerProvider implements pulumi.dynamic.ResourceProvider {
     // 6. Flatten properties
     const properties = this.flattenProperties(filteredSources);
 
-    // 7. Log success
+    // 7. Build property source map (for serialization)
+    const propertySourceMap: Record<string, Record<string, unknown>> = {};
+    const propertySourceNames: string[] = [];
+
+    for (const source of filteredSources) {
+      propertySourceNames.push(source.name);
+      propertySourceMap[source.name] = source.source;
+    }
+
+    // 8. Log success
     const duration = Date.now() - startTime;
     void pulumi.log.info(
       `Successfully fetched ${Object.keys(properties).length} properties in ${duration}ms`
     );
 
-    // 8. Build state
+    // 9. Build state with serializable fields
     const state: ConfigServerProviderState = {
       configServerUrl: inputs.configServerUrl as string,
       application: inputs.application as string,
@@ -129,10 +157,13 @@ export class ConfigServerProvider implements pulumi.dynamic.ResourceProvider {
       debug: inputs.debug as boolean | undefined,
       autoDetectSecrets: inputs.autoDetectSecrets !== false, // default: true
       enforceHttps: inputs.enforceHttps as boolean | undefined,
-      config: {
-        ...config,
-        propertySources: filteredSources,
-      },
+      // Serialization-friendly config data
+      configName: config.name,
+      configProfiles: config.profiles,
+      configLabel: config.label,
+      configVersion: config.version,
+      propertySourceNames,
+      propertySourceMap,
       properties,
     };
 

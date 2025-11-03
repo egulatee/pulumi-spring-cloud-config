@@ -7,7 +7,6 @@
 
 import { ConfigServerProvider } from '../../src/provider';
 import { ConfigServerClient } from '../../src/client';
-import type { PropertySource } from '../../src/types';
 import {
   multiSourceResponse,
   vaultOnlyResponse,
@@ -47,8 +46,8 @@ describe('ConfigServerProvider - Filtering', () => {
 
       const result = await provider.create(inputs);
 
-      expect(result.outs.config.propertySources).toHaveLength(1);
-      expect(result.outs.config.propertySources[0].name).toContain('vault');
+      expect(result.outs.propertySourceNames).toHaveLength(1);
+      expect(result.outs.propertySourceNames[0]).toContain('vault');
     });
 
     it('should filter by multiple property source names', async () => {
@@ -63,8 +62,8 @@ describe('ConfigServerProvider - Filtering', () => {
 
       const result = await provider.create(inputs);
 
-      expect(result.outs.config.propertySources.length).toBeGreaterThanOrEqual(2);
-      const names = result.outs.config.propertySources.map((ps: PropertySource) => ps.name);
+      expect(result.outs.propertySourceNames.length).toBeGreaterThanOrEqual(2);
+      const names = result.outs.propertySourceNames;
       expect(names.some((name: string) => name.includes('vault'))).toBe(true);
       expect(names.some((name: string) => name.includes('git'))).toBe(true);
     });
@@ -81,7 +80,7 @@ describe('ConfigServerProvider - Filtering', () => {
 
       const result = await provider.create(inputs);
 
-      expect(result.outs.config.propertySources).toHaveLength(0);
+      expect(result.outs.propertySourceNames).toHaveLength(0);
       expect(result.outs.properties).toEqual({});
     });
 
@@ -97,7 +96,7 @@ describe('ConfigServerProvider - Filtering', () => {
 
       const result = await provider.create(inputs);
 
-      expect(result.outs.config.propertySources).toHaveLength(
+      expect(result.outs.propertySourceNames).toHaveLength(
         multiSourceResponse.propertySources.length
       );
     });
@@ -114,7 +113,7 @@ describe('ConfigServerProvider - Filtering', () => {
 
       const result = await provider.create(inputs);
 
-      expect(result.outs.config.propertySources).toHaveLength(
+      expect(result.outs.propertySourceNames).toHaveLength(
         multiSourceResponse.propertySources.length
       );
     });
@@ -131,8 +130,8 @@ describe('ConfigServerProvider - Filtering', () => {
 
       const result = await provider.create(inputs);
 
-      expect(result.outs.config.propertySources).toHaveLength(1);
-      expect(result.outs.config.propertySources[0].name.toLowerCase()).toContain('vault');
+      expect(result.outs.propertySourceNames).toHaveLength(1);
+      expect(result.outs.propertySourceNames[0].toLowerCase()).toContain('vault');
     });
 
     it('should not match property sources with partial name match only', async () => {
@@ -147,7 +146,7 @@ describe('ConfigServerProvider - Filtering', () => {
 
       const result = await provider.create(inputs);
 
-      expect(result.outs.config.propertySources).toHaveLength(0);
+      expect(result.outs.propertySourceNames).toHaveLength(0);
     });
 
     it('should handle multiple sources with same name prefix', async () => {
@@ -185,9 +184,9 @@ describe('ConfigServerProvider - Filtering', () => {
 
       const result = await provider.create(inputs);
 
-      expect(result.outs.config.propertySources).toHaveLength(2);
-      expect(result.outs.config.propertySources[0].name).toContain('vault');
-      expect(result.outs.config.propertySources[1].name).toContain('vault');
+      expect(result.outs.propertySourceNames).toHaveLength(2);
+      expect(result.outs.propertySourceNames[0]).toContain('vault');
+      expect(result.outs.propertySourceNames[1]).toContain('vault');
     });
 
     it('should preserve order of property sources after filtering', async () => {
@@ -204,7 +203,7 @@ describe('ConfigServerProvider - Filtering', () => {
 
       // Original order in multiSourceResponse: file, git, vault
       // After filtering for git and vault, git should come before vault
-      const names = result.outs.config.propertySources.map((ps: PropertySource) => ps.name);
+      const names = result.outs.propertySourceNames;
       const gitIndex: number = names.findIndex((name: string) => name.includes('git'));
       const vaultIndex: number = names.findIndex((name: string) => name.includes('vault'));
 
@@ -225,8 +224,8 @@ describe('ConfigServerProvider - Filtering', () => {
 
       const result = await provider.create(inputs);
 
-      expect(result.outs.config.propertySources).toHaveLength(1);
-      expect(result.outs.config.propertySources[0].name).toContain('vault');
+      expect(result.outs.propertySourceNames).toHaveLength(1);
+      expect(result.outs.propertySourceNames[0]).toContain('vault');
       expect(result.outs.properties).toMatchObject({
         'database.host': 'prod-db.example.com',
         'database.port': '5432',
