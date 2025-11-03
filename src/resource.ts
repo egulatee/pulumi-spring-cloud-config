@@ -52,6 +52,24 @@ export class ConfigServerConfig extends pulumi.dynamic.Resource {
   public readonly properties!: pulumi.Output<Record<string, unknown>>;
 
   /**
+   * Ordered list of property source names
+   *
+   * @remarks
+   * This is used internally for source filtering and reconstruction.
+   * Property sources are listed in the order they were returned from the config server.
+   */
+  public readonly propertySourceNames!: pulumi.Output<string[]>;
+
+  /**
+   * Map of property source names to their properties
+   *
+   * @remarks
+   * This is used internally for source filtering and reconstruction.
+   * Each source name maps to its complete set of properties.
+   */
+  public readonly propertySourceMap!: pulumi.Output<Record<string, Record<string, unknown>>>;
+
+  /**
    * Whether automatic secret detection is enabled
    *
    * @private
@@ -77,6 +95,8 @@ export class ConfigServerConfig extends pulumi.dynamic.Resource {
       {
         config: undefined,
         properties: undefined,
+        propertySourceNames: undefined,
+        propertySourceMap: undefined,
         ...args,
         autoDetectSecrets: autoDetect,
       },
@@ -145,17 +165,11 @@ export class ConfigServerConfig extends pulumi.dynamic.Resource {
    * ```
    */
   getSourceProperties(sourceNames?: string[]): pulumi.Output<Record<string, unknown>> {
-    // Access the outputs from the resource state without using private Output fields
-    // This avoids the Pulumi serialization race condition with Jest teardown
-    const resourceOutput = pulumi.output(this);
-
-    return resourceOutput.apply(
-      (resource: {
-        propertySourceNames?: string[];
-        propertySourceMap?: Record<string, Record<string, unknown>>;
-      }) => {
-        const names: string[] = resource.propertySourceNames ?? [];
-        const sourceMap: Record<string, Record<string, unknown>> = resource.propertySourceMap ?? {};
+    // Use the explicit Output properties instead of pulumi.output(this)
+    // This avoids TypeScript type compatibility issues with Pulumi's Output.apply()
+    return pulumi
+      .all([this.propertySourceNames, this.propertySourceMap])
+      .apply(([names, sourceMap]) => {
         const result: Record<string, unknown> = {};
 
         // Guard against undefined/null names
@@ -176,8 +190,7 @@ export class ConfigServerConfig extends pulumi.dynamic.Resource {
         }
 
         return result;
-      }
-    );
+      });
   }
 
   /**
