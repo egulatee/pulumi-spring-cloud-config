@@ -1,0 +1,45 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Added
+- Initial project setup with TypeScript configuration
+- Smart diffing implementation for efficient configuration fetching
+- Automatic secret detection based on property key patterns
+- Basic Authentication support for Spring Cloud Config Server
+- Property source filtering (e.g., Vault-only)
+- Configurable timeout support
+- Debug mode for verbose logging
+- HTTPS enforcement option
+- Comprehensive README with usage examples
+- CI/CD workflows for testing and publishing
+- Commitlint and Husky for code quality
+- Jest testing framework with coverage reporting
+- ESLint and Prettier for code style enforcement
+
+## [0.1.0] - TBD
+
+Initial release
+
+### Features
+- Pulumi Dynamic Provider for Spring Cloud Config Server integration
+- Smart diffing to only fetch configuration when inputs change
+- Automatic secret detection and marking
+- Basic Authentication support
+- Property source filtering
+- Configurable timeouts
+- TypeScript support with full type definitions
+- Debug mode for troubleshooting
+
+### Requirements
+- Node.js >= 18.0.0
+- Pulumi >= 3.0.0
+- Spring Cloud Config Server >= 2.3.0
+
+[Unreleased]: https://github.com/egulatee/pulumi-spring-cloud-config/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/egulatee/pulumi-spring-cloud-config/releases/tag/v0.1.0
