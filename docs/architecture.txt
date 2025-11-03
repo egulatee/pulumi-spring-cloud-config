@@ -1,0 +1,298 @@
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                  Pulumi Spring Cloud Config Provider                         │
+│                          Architecture Overview                               │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────┐
+│   Pulumi Program    │
+│   (index.ts/py/go)  │
+│                     │
+│  const config =     │
+│  new ConfigServer   │
+│  Config(...)        │
+└──────────┬──────────┘
+           │
+           │ Creates resource
+           │
+           ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                     ConfigServerConfig Resource                              │
+│                        (src/resource.ts)                                     │
+│                                                                              │
+│  ┌────────────────────────────────────────────────────────────────────┐    │
+│  │  Constructor                                                        │    │
+│  │  • Validates inputs (URL, application, profile)                    │    │
+│  │  • Creates dynamic provider instance                               │    │
+│  │  • Registers resource with Pulumi engine                           │    │
+│  └──────────────────────┬──────────────────────────────────────────────┘    │
+│                         │                                                    │
+│                         │ Delegates to                                       │
+│                         ▼                                                    │
+│  ┌────────────────────────────────────────────────────────────────────┐    │
+│  │  Methods                                                            │    │
+│  │  • getProperty(key, markAsSecret?)                                 │    │
+│  │  • getSourceProperties(sourceNames?)                               │    │
+│  │  • getAllSecrets()                                                 │    │
+│  └────────────────────────────────────────────────────────────────────┘    │
+│                                                                              │
+└───────────────────────────────┬──────────────────────────────────────────────┘
+                                │
+                                │ Uses
+                                ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      Dynamic Resource Provider                               │
+│                         (src/provider.ts)                                    │
+│                                                                              │
+│  ┌────────────────────────────────────────────────────────────────────┐    │
+│  │  Lifecycle: create(inputs)                                          │    │
+│  │  • Validates inputs (application, profile required)                │    │
+│  │  • Checks HTTPS (warns or fails based on enforceHttps)             │    │
+│  │  • Calls HTTP client to fetch configuration                        │    │
+│  │  • Processes response → flattens properties                        │    │
+│  │  • Applies secret detection if autoDetectSecrets: true             │    │
+│  │  • Returns outputs {id, config, properties}                        │    │
+│  └────────────────────────────────────────────────────────────────────┘    │
+│                                                                              │
+│  ┌────────────────────────────────────────────────────────────────────┐    │
+│  │  Lifecycle: diff(id, oldInputs, newInputs)                          │    │
+│  │  • Smart diffing: only refresh if inputs changed                   │    │
+│  │  • Compares: URL, app, profile, label, auth, filters, etc.        │    │
+│  │  • Returns {changes: true/false, replaces: [...]}                  │    │
+│  └────────────────────────────────────────────────────────────────────┘    │
+│                                                                              │
+│  ┌────────────────────────────────────────────────────────────────────┐    │
+│  │  Lifecycle: update(id, oldInputs, newInputs)                        │    │
+│  │  • Re-fetches configuration with new inputs                        │    │
+│  │  • Same processing as create()                                     │    │
+│  └────────────────────────────────────────────────────────────────────┘    │
+│                                                                              │
+└───────────────────────────────┬──────────────────────────────────────────────┘
+                                │
+                                │ Uses
+                                ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          HTTP Client                                         │
+│                         (src/client.ts)                                      │
+│                                                                              │
+│  ┌────────────────────────────────────────────────────────────────────┐    │
+│  │  fetchConfig(params)                                                │    │
+│  │  • Constructs URL: {url}/{app}/{profile}?label={label}             │    │
+│  │  • Adds Basic Auth headers if username/password provided           │    │
+│  │  • Sets timeout from config (default: 10s)                         │    │
+│  │  • Makes HTTP GET request via Axios                                │    │
+│  │  • Implements retry logic with exponential backoff                 │    │
+│  │  • Handles errors and sanitizes credentials from messages          │    │
+│  └────────────────────────┬───────────────────────────────────────────┘    │
+│                           │                                                  │
+│  ┌────────────────────────▼───────────────────────────────────────────┐    │
+│  │  Retry Logic (retryableRequest)                                     │    │
+│  │  • Max retries: 3 (configurable)                                   │    │
+│  │  • Retry delay: 1000ms (configurable)                              │    │
+│  │  • Backoff multiplier: 2x (exponential)                            │    │
+│  │  • Retries on: 503, network errors, timeouts                       │    │
+│  │  • Fails fast on: 401, 403, 404, other 4xx/5xx                     │    │
+│  └────────────────────────────────────────────────────────────────────┘    │
+│                                                                              │
+└───────────────────────────────┬──────────────────────────────────────────────┘
+                                │
+                                │ HTTP GET Request
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                  Spring Cloud Config Server                                  │
+│                  (External Service)                                          │
+│                                                                              │
+│  Endpoint: GET /{application}/{profile}[/{label}]                           │
+│  Example:  GET /my-app/production                                            │
+│                                                                              │
+│  ┌────────────────────────────────────────────────────────────────────┐    │
+│  │  Configuration Sources (Priority: last wins)                        │    │
+│  │                                                                      │    │
+│  │  1. Git Repository                                                  │    │
+│  │     └─ application.yml, my-app.yml, my-app-production.yml          │    │
+│  │                                                                      │    │
+│  │  2. HashiCorp Vault (optional)                                      │    │
+│  │     └─ vault:/secret/application/production                         │    │
+│  │                                                                      │    │
+│  │  3. Local Filesystem (native profile)                               │    │
+│  │     └─ file:///config/application.yml                               │    │
+│  │                                                                      │    │
+│  │  4. Other backends: Consul, AWS Secrets Manager, etc.               │    │
+│  └────────────────────────────────────────────────────────────────────┘    │
+│                                                                              │
+│  Response Format (JSON):                                                     │
+│  {                                                                            │
+│    "name": "my-app",                                                         │
+│    "profiles": ["production"],                                               │
+│    "label": "main",                                                          │
+│    "version": "abc123",                                                      │
+│    "propertySources": [                                                      │
+│      {                                                                        │
+│        "name": "git:https://github.com/org/config#my-app-production.yml",   │
+│        "source": {                                                           │
+│          "database.host": "prod-db.example.com",                             │
+│          "database.password": "secret123",                                   │
+│          "api.key": "prod-api-key"                                           │
+│        }                                                                      │
+│      },                                                                       │
+│      {                                                                        │
+│        "name": "vault:/secret/my-app/production",                            │
+│        "source": {                                                           │
+│          "database.password": "vault-managed-secret",                        │
+│          "encryption.key": "vault-encryption-key"                            │
+│        }                                                                      │
+│      }                                                                        │
+│    ]                                                                          │
+│  }                                                                            │
+│                                                                              │
+└───────────────────────────────┬──────────────────────────────────────────────┘
+                                │
+                                │ HTTP Response (200 OK)
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      Response Processing                                     │
+│                      (src/provider.ts)                                       │
+│                                                                              │
+│  Step 1: Flatten Properties                                                  │
+│  ────────────────────────────────────────────────────────────────────       │
+│  Merge all property sources into single key-value map                        │
+│  Later sources override earlier ones (Spring Cloud Config behavior)          │
+│                                                                              │
+│  Input:  propertySources = [                                                 │
+│            {name: "git:...", source: {"db.password": "git-pass"}},          │
+│            {name: "vault:...", source: {"db.password": "vault-pass"}}       │
+│          ]                                                                    │
+│  Output: {"db.password": "git-pass"}  ← First source wins                   │
+│                                                                              │
+│  ┌────────────────────────────────────────────────────────────────────┐    │
+│  │  Step 2: Secret Detection (if autoDetectSecrets: true)              │    │
+│  │  ────────────────────────────────────────────────────────────────  │    │
+│  │  Pattern: /password|secret|token|.*key$|credential|auth|api[-_]?key/i │  │
+│  │                                                                      │    │
+│  │  Examples:                                                           │    │
+│  │    database.password     → SECRET                                   │    │
+│  │    api.key               → SECRET                                   │    │
+│  │    jwt.secret            → SECRET                                   │    │
+│  │    oauth.token           → SECRET                                   │    │
+│  │    encryption.masterKey  → SECRET (ends with 'key')                 │    │
+│  │    server.port           → NOT SECRET                               │    │
+│  │    database.host         → NOT SECRET                               │    │
+│  └────────────────────────────────────────────────────────────────────┘    │
+│                                                                              │
+│  Step 3: Wrap Secrets                                                        │
+│  ────────────────────────────────────────────────────────────────────       │
+│  Detected secrets are wrapped with pulumi.secret()                           │
+│  Secrets are encrypted in Pulumi state                                       │
+│  Secrets are marked [secret] in outputs                                      │
+│                                                                              │
+│  Step 4: Return Outputs                                                      │
+│  ────────────────────────────────────────────────────────────────────       │
+│  {                                                                            │
+│    id: "config-server-config-<hash>",                                        │
+│    config: <full ConfigServerResponse>,                                      │
+│    properties: <flattened properties map>                                    │
+│  }                                                                            │
+│                                                                              │
+└───────────────────────────────┬──────────────────────────────────────────────┘
+                                │
+                                │ Outputs available to Pulumi program
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    User's Pulumi Program                                     │
+│                                                                              │
+│  // Access full configuration response                                       │
+│  export const fullConfig = config.config;                                    │
+│                                                                              │
+│  // Access all flattened properties                                          │
+│  export const allProps = config.properties;                                  │
+│                                                                              │
+│  // Get individual property                                                  │
+│  export const dbPassword = config.getProperty("database.password");          │
+│  // Returns: pulumi.Output<string> (marked as secret)                        │
+│                                                                              │
+│  // Filter by property source                                                │
+│  export const vaultProps = config.getSourceProperties(["vault"]);            │
+│  // Returns: pulumi.Output<Record<string, unknown>> (Vault properties only)  │
+│                                                                              │
+│  // Get all auto-detected secrets                                            │
+│  export const secrets = config.getAllSecrets();                              │
+│  // Returns: pulumi.Output<Record<string, string>> (all secrets)             │
+│                                                                              │
+│  // Use in infrastructure                                                    │
+│  new aws.rds.Instance("db", {                                                │
+│      username: config.getProperty("database.username"),                      │
+│      password: config.getProperty("database.password"),  // Secret           │
+│      // ...                                                                   │
+│  });                                                                          │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          Key Features                                        │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ✓ Automatic Secret Detection                                                │
+│    Properties matching secret patterns are automatically marked as secrets   │
+│                                                                              │
+│  ✓ Smart Diffing                                                             │
+│    Only re-fetches configuration when inputs change                          │
+│    Use `pulumi refresh` to detect upstream config changes                    │
+│                                                                              │
+│  ✓ Retry with Exponential Backoff                                            │
+│    Handles transient failures gracefully                                     │
+│    3 retries by default, configurable                                        │
+│                                                                              │
+│  ✓ Property Source Filtering                                                 │
+│    Extract properties from specific backends (Vault, Git, etc.)              │
+│                                                                              │
+│  ✓ Flexible Authentication                                                   │
+│    Supports Basic Auth, more auth types planned                              │
+│                                                                              │
+│  ✓ HTTPS Enforcement                                                         │
+│    Optional strict HTTPS checking (with localhost exemption)                 │
+│                                                                              │
+│  ✓ Type-Safe API                                                             │
+│    Full TypeScript support with type definitions                             │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        Data Flow Summary                                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+1. Pulumi Program creates ConfigServerConfig resource
+2. Resource delegates to Dynamic Provider
+3. Provider validates inputs and constructs HTTP request
+4. HTTP Client makes request to Config Server (with retry)
+5. Config Server fetches from multiple sources (Git, Vault, etc.)
+6. Config Server merges sources and returns JSON response
+7. Provider processes response:
+   - Flattens property sources
+   - Detects secrets automatically
+   - Wraps secrets with pulumi.secret()
+8. Outputs returned to Pulumi engine
+9. User accesses properties via methods:
+   - getProperty()
+   - getSourceProperties()
+   - getAllSecrets()
+10. Properties used to configure infrastructure
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      Error Handling Flow                                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+HTTP 401 → ConfigServerError: Authentication failed
+HTTP 403 → ConfigServerError: Access forbidden
+HTTP 404 → ConfigServerError: Configuration not found for {app}/{profile}
+HTTP 503 → RETRY (up to 3 times) → Eventually fail if persistent
+Network Error → RETRY (up to 3 times) → ConfigServerError: Network error
+Timeout → RETRY (up to 3 times) → ConfigServerError: Request timeout
+Other 5xx → ConfigServerError: Config server internal error
+
+All errors sanitize credentials from error messages for security

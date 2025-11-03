@@ -1,0 +1,27 @@
+# Vault-specific secrets for vault-app example
+# This simulates properties that would come from HashiCorp Vault
+# When profile "vault" is active, these properties are added as a separate property source
+
+# Database credentials (would be from Vault in production)
+database:
+  username: "vault_db_user"
+  password: "vault-managed-password-123"  # Auto-detected as secret
+
+# API credentials (would be from Vault in production)
+api:
+  externalService:
+    apiKey: "vault-api-key-abcdef123456"  # Auto-detected as secret
+    secret: "vault-api-secret-xyz789"  # Auto-detected as secret
+
+# Encryption keys (would be from Vault in production)
+encryption:
+  masterKey: "vault-encryption-key-aes256"  # Auto-detected as secret
+  rotationKey: "vault-rotation-key-123"  # Auto-detected as secret
+
+# OAuth/JWT secrets (would be from Vault in production)
+oauth:
+  clientSecret: "vault-oauth-client-secret"  # Auto-detected as secret
+
+aws:
+  accessKey: "AKIAIOSFODNN7EXAMPLE"
+  secretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"  # Auto-detected as secret

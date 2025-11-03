@@ -1,0 +1,6 @@
+name: basic-example
+runtime:
+  name: nodejs
+  options:
+    typescript: true
+description: Basic example demonstrating simple configuration fetching from Spring Cloud Config Server

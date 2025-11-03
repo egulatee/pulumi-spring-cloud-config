@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  config-server:
+    image: hyness/spring-cloud-config-server:3.1.9
+    container_name: spring-cloud-config-server
+    ports:
+      - "8888:8888"
+    environment:
+      - SPRING_PROFILES_ACTIVE=native
+      - SPRING_CLOUD_CONFIG_SERVER_NATIVE_SEARCH_LOCATIONS=file:///config
+      # Basic authentication credentials
+      - SPRING_SECURITY_USER_NAME=admin
+      - SPRING_SECURITY_USER_PASSWORD=secret123
+    volumes:
+      - ./config-repo:/config:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - config-network
+
+networks:
+  config-network:
+    driver: bridge

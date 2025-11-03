@@ -1,0 +1,6 @@
+name: vault-only-example
+runtime:
+  name: nodejs
+  options:
+    typescript: true
+description: Example demonstrating property source filtering to extract only Vault secrets

@@ -1,0 +1,55 @@
+# Production environment configuration
+# These properties override base configuration for production
+
+app:
+  environment: "production"
+
+server:
+  port: 8080
+
+database:
+  host: "prod-db.example.com"
+  port: 5432
+  name: "multi_env_prod"
+  username: "prod_user"
+  password: "prod-password-789-super-secret"  # Auto-detected as secret
+  maxConnections: 100
+  ssl:
+    enabled: true
+
+api:
+  external:
+    endpoint: "https://api.example.com"
+    apiKey: "prod-api-key-789"  # Auto-detected as secret
+    timeout: 10000
+
+logging:
+  level:
+    root: "WARN"
+    com.example: "INFO"
+
+features:
+  enableDebugMode: false
+  enableHotReload: false
+  enableMockData: false
+  enablePerformanceMonitoring: true
+  enableAdvancedSecurity: true
+
+aws:
+  region: "us-east-1"
+  accountId: "123456789012"
+
+cache:
+  enabled: true
+  ttl: 600
+
+security:
+  encryption:
+    enabled: true
+    algorithm: "AES-256"
+    key: "prod-encryption-master-key"  # Auto-detected as secret
+
+backup:
+  enabled: true
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  retentionDays: 30

@@ -1,0 +1,6 @@
+name: multi-environment-example
+runtime:
+  name: nodejs
+  options:
+    typescript: true
+description: Multi-environment example demonstrating stack-based configuration management

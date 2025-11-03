@@ -1,0 +1,6 @@
+name: complete-aws-example
+runtime:
+  name: nodejs
+  options:
+    typescript: true
+description: Complete AWS infrastructure with RDS, ECS, and configuration from Spring Cloud Config Server

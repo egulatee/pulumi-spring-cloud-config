@@ -1,0 +1,68 @@
+# Configuration for complete-app AWS integration example
+# This demonstrates a real-world production scenario
+
+spring:
+  application:
+    name: "complete-app"
+  datasource:
+    url: "jdbc:postgresql://prod-db.example.com:5432/complete_app"
+    username: "app_admin"
+    password: "rds-database-password-prod-123"  # Auto-detected as secret
+    hikari:
+      maximumPoolSize: 20
+      minimumIdle: 5
+      connectionTimeout: 30000
+
+server:
+  port: 8080
+  tomcat:
+    maxThreads: 200
+    minSpareThreads: 10
+
+aws:
+  region: "us-east-1"
+  s3:
+    bucket: "complete-app-storage"
+  secretsManager:
+    enabled: true
+
+database:
+  rds:
+    instanceClass: "db.t3.micro"
+    allocatedStorage: 20
+    engine: "postgres"
+    engineVersion: "15.4"
+
+application:
+  environment: "production"
+  tier: "web"
+
+ecs:
+  service:
+    desiredCount: 2
+    cpu: "256"
+    memory: "512"
+
+monitoring:
+  cloudwatch:
+    enabled: true
+    namespace: "CompleteApp"
+
+logging:
+  level:
+    root: "INFO"
+    com.example.complete: "DEBUG"
+
+security:
+  cors:
+    allowedOrigins: "https://example.com"
+    allowedMethods: "GET,POST,PUT,DELETE"
+
+secrets:
+    apiToken: "prod-api-token-xyz789"  # Auto-detected as secret
+    jwtSecret: "jwt-signing-key-production"  # Auto-detected as secret
+
+features:
+  enableAutoScaling: true
+  enableBackups: true
+  enableEncryption: true
