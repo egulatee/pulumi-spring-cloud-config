@@ -66,7 +66,7 @@ export class ConfigServerProvider implements pulumi.dynamic.ResourceProvider {
     _id: pulumi.ID,
     olds: ConfigServerProviderState,
     news: ConfigServerConfigArgs
-  ): pulumi.dynamic.DiffResult {
+  ): Promise<pulumi.dynamic.DiffResult> {
     // Smart diffing: Only refresh when inputs change
     const inputsChanged =
       olds.configServerUrl !== news.configServerUrl ||
@@ -77,11 +77,11 @@ export class ConfigServerProvider implements pulumi.dynamic.ResourceProvider {
       olds.password !== news.password ||
       JSON.stringify(olds.propertySources) !== JSON.stringify(news.propertySources);
 
-    return {
+    return Promise.resolve({
       changes: inputsChanged,
       replaces: [],
       stables: [],
-    };
+    });
   }
 
   async update(
