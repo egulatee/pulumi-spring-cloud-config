@@ -6,6 +6,81 @@ import { ConfigServerClient } from './client';
 import { ConfigServerConfigArgs, PropertySource } from './types';
 
 /**
+ * Diagnostic utility: Get detailed type information about a value
+ *
+ * @param value - Value to inspect
+ * @returns Detailed type string (e.g., "string", "Date", "Buffer", "undefined")
+ */
+function getDetailedType(value: unknown): string {
+  if (value === null) return 'null';
+  if (value === undefined) return 'undefined';
+
+  const basicType = typeof value;
+  if (basicType !== 'object') return basicType;
+
+  // Check for specific object types that might cause serialization issues
+  if (value instanceof Date) return 'Date';
+  if (value instanceof RegExp) return 'RegExp';
+  if (value instanceof Error) return 'Error';
+  if (Buffer.isBuffer(value)) return 'Buffer';
+  if (Array.isArray(value)) return 'Array';
+
+  // Check for Pulumi Output types
+  const constructor = value.constructor?.name;
+  if (constructor?.includes('Output')) return `Pulumi.${constructor}`;
+
+  return `Object (${constructor || 'unknown'})`;
+}
+
+/**
+ * Diagnostic utility: Check if a value is JSON-serializable primitive
+ *
+ * @param value - Value to check
+ * @returns true if value is a serializable primitive
+ */
+function isSerializable(value: unknown): boolean {
+  if (value === null) return true;
+  const type = typeof value;
+  if (type === 'string' || type === 'number' || type === 'boolean') return true;
+  if (type === 'undefined') return false;
+  if (type === 'object' && value !== null) {
+    // Plain objects and arrays might be serializable
+    if (Array.isArray(value)) {
+      return value.every(isSerializable);
+    }
+    if (value instanceof Date || Buffer.isBuffer(value)) return false;
+    // Check if it's a plain object with a constructor
+    const hasConstructor = Object.prototype.hasOwnProperty.call(value, 'constructor');
+    if (!hasConstructor || (value as { constructor?: unknown }).constructor === Object) {
+      const objValue = value as Record<string, unknown>;
+      return Object.values(objValue).every(isSerializable);
+    }
+    return false;
+  }
+  return false;
+}
+
+/**
+ * Diagnostic utility: Log detailed information about a property value
+ *
+ * @param path - Property path (e.g., "propertySourceMap.application.db.password")
+ * @param value - Value to log
+ * @param debug - Whether debug mode is enabled
+ */
+function logValueDetails(path: string, value: unknown, debug: boolean): void {
+  const type = getDetailedType(value);
+  const serializable = isSerializable(value);
+
+  if (!serializable) {
+    void pulumi.log.warn(
+      `[DIAGNOSTIC] Non-serializable value detected at ${path}: type=${type}, value=${String(value).substring(0, 100)}`
+    );
+  } else if (debug) {
+    void pulumi.log.debug(`[DIAGNOSTIC] ${path}: type=${type}, serializable=true`);
+  }
+}
+
+/**
  * Provider state stored by Pulumi
  *
  * @remarks
@@ -133,18 +208,40 @@ export class ConfigServerProvider implements pulumi.dynamic.ResourceProvider {
     const propertySourceMap: Record<string, Record<string, unknown>> = {};
     const propertySourceNames: string[] = [];
 
+    void pulumi.log.info('[DIAGNOSTIC] Analyzing property sources for serialization issues...');
+
     for (const source of filteredSources) {
       propertySourceNames.push(source.name);
       propertySourceMap[source.name] = source.source;
+
+      // Log each property in this source
+      void pulumi.log.info(
+        `[DIAGNOSTIC] Property source: ${source.name} (${Object.keys(source.source).length} properties)`
+      );
+
+      for (const [key, value] of Object.entries(source.source)) {
+        const path = `propertySourceMap.${source.name}.${key}`;
+        logValueDetails(path, value, inputs.debug as boolean);
+      }
     }
 
-    // 8. Log success
+    // 8. Analyze flattened properties
+    void pulumi.log.info(
+      `[DIAGNOSTIC] Analyzing flattened properties (${Object.keys(properties).length} total)...`
+    );
+
+    for (const [key, value] of Object.entries(properties)) {
+      const path = `properties.${key}`;
+      logValueDetails(path, value, inputs.debug as boolean);
+    }
+
+    // 9. Log success
     const duration = Date.now() - startTime;
     void pulumi.log.info(
       `Successfully fetched ${Object.keys(properties).length} properties in ${duration}ms`
     );
 
-    // 9. Build state with serializable fields
+    // 10. Build state with serializable fields
     const state: ConfigServerProviderState = {
       configServerUrl: inputs.configServerUrl as string,
       application: inputs.application as string,
@@ -166,6 +263,39 @@ export class ConfigServerProvider implements pulumi.dynamic.ResourceProvider {
       propertySourceMap,
       properties,
     };
+
+    // 11. Final diagnostic check: Attempt JSON serialization
+    void pulumi.log.info('[DIAGNOSTIC] Performing final serialization test...');
+    try {
+      const serialized = JSON.stringify(state);
+      void pulumi.log.info(
+        `[DIAGNOSTIC] ✓ State is JSON-serializable (${serialized.length} bytes)`
+      );
+
+      // Parse it back to check for any data loss
+      const parsed = JSON.parse(serialized) as Record<string, unknown>;
+      const originalKeys = Object.keys(state).filter(
+        (key) => state[key as keyof typeof state] !== undefined
+      );
+      const parsedKeys = Object.keys(parsed);
+
+      if (originalKeys.length !== parsedKeys.length) {
+        const missingKeys = originalKeys.filter((key) => !(key in parsed));
+        void pulumi.log.warn(
+          `[DIAGNOSTIC] Warning: Key count mismatch after serialization (${originalKeys.length} → ${parsedKeys.length}). Missing keys: ${missingKeys.join(', ')}`
+        );
+      }
+    } catch (error) {
+      void pulumi.log.error(
+        `[DIAGNOSTIC] ✗ JSON serialization test FAILED: ${error instanceof Error ? error.message : String(error)}`
+      );
+      void pulumi.log.error(
+        '[DIAGNOSTIC] This indicates the state contains non-JSON-serializable values!'
+      );
+
+      // Log state structure for debugging
+      void pulumi.log.error(`[DIAGNOSTIC] State structure: ${JSON.stringify(Object.keys(state))}`);
+    }
 
     return {
       id: `${state.application}-${state.profile}${state.label ? `-${state.label}` : ''}`,
