@@ -1,8 +1,12 @@
-name: Publish to NPM
+# ⚠️ DEPRECATED: This workflow is being replaced by release.yml with semantic-release automation
+# This workflow will be removed in a future release once semantic-release is fully validated
+# See Issue #46 for details: https://github.com/egulatee/pulumi-spring-cloud-config/issues/46
+
+name: Publish to NPM (DEPRECATED)
 
 on:
-  release:
-    types: [published]
+  # Disabled - use release.yml instead
+  workflow_dispatch: # Manual trigger only for emergency use
 
 jobs:
   publish:

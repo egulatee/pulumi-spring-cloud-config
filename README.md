@@ -672,6 +672,94 @@ All examples include:
 
 See [examples/README.md](./examples/README.md) for quick start instructions.
 
+## Releases
+
+This project uses [semantic-release](https://github.com/semantic-release/semantic-release) for automated version management and package publishing.
+
+### Automated Release Process
+
+Releases happen automatically when commits are merged to the `main` branch. No manual intervention is required.
+
+**How it works:**
+
+1. **Merge to main** - When a pull request is merged to `main`
+2. **CI runs tests** - Full test suite, linting, and build validation
+3. **Semantic-release analyzes commits** - Determines version bump based on commit types
+4. **Version updated** - `package.json` version is bumped automatically
+5. **CHANGELOG generated** - Release notes created from commit messages
+6. **Git tag created** - Version tag pushed to repository (e.g., `v0.1.0`)
+7. **GitHub release created** - Release published with generated notes
+8. **NPM package published** - Package published to NPM registry
+
+### Version Bumping Rules
+
+Versions are determined by commit message types following [Conventional Commits](https://www.conventionalcommits.org/):
+
+| Commit Type | Version Bump | Example |
+|-------------|--------------|---------|
+| `fix:` | **PATCH** | `0.1.0` → `0.1.1` |
+| `feat:` | **MINOR** | `0.1.0` → `0.2.0` |
+| `BREAKING CHANGE:` | **MINOR** (in 0.x) | `0.1.0` → `0.2.0` |
+| `BREAKING CHANGE:` | **MAJOR** (in 1.x+) | `1.0.0` → `2.0.0` |
+
+**Note:** Breaking changes bump MINOR version in `0.x` releases to signal instability. Once the package reaches `1.0.0`, breaking changes will bump MAJOR version.
+
+### For Contributors
+
+When contributing to this project:
+
+1. **Follow Conventional Commits** - Your commit messages determine the release version
+   ```bash
+   feat: add OAuth2 authentication support
+   fix: resolve timeout error in config fetch
+   docs: update README with new examples
+   ```
+
+2. **No manual version bumping** - Never edit `package.json` version manually
+   - ❌ Don't: `"version": "0.2.0"`
+   - ✅ Do: Use conventional commit messages
+
+3. **No manual CHANGELOG edits** - CHANGELOG.md is auto-generated
+   - Write clear commit messages instead
+   - They become your release notes
+
+4. **View releases** - Check [GitHub Releases](https://github.com/egulatee/pulumi-spring-cloud-config/releases) for published versions
+
+### Commit Message Examples
+
+**Adding a feature (MINOR bump):**
+```bash
+git commit -m "feat: add support for JWT authentication
+
+Implements JWT token authentication for config server.
+Allows users to authenticate using bearer tokens.
+
+Closes #123"
+```
+
+**Fixing a bug (PATCH bump):**
+```bash
+git commit -m "fix: resolve timeout error in retry logic
+
+The exponential backoff was not respecting max timeout.
+Now correctly times out after configured duration.
+
+Fixes #456"
+```
+
+**Breaking change (MINOR in 0.x, MAJOR in 1.x+):**
+```bash
+git commit -m "feat: redesign authentication API
+
+BREAKING CHANGE: The authentication configuration has been
+restructured. Users must migrate from 'username/password'
+to 'auth: { type: "basic", credentials: {...} }'.
+
+See migration guide for details.
+
+Fixes #789"
+```
+
 ## Development
 
 ### Setup
