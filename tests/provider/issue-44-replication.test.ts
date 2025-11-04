@@ -13,7 +13,15 @@ import { Struct, JavaScriptValue } from 'google-protobuf/google/protobuf/struct_
 
 // Helper type for protobuf roundtrip results
 // After serialization/deserialization through protobuf, we get back a plain JS object
+// with the same structure as ConfigServerProviderState
 interface ProtobufRoundtrip {
+  configName?: string;
+  configProfiles?: string[];
+  configLabel?: string | null;
+  configVersion?: string | null;
+  propertySourceMap?: Record<string, Record<string, string | number | boolean | null>>;
+  properties?: Record<string, string | number | boolean | null>;
+  propertySourceNames?: string[];
   [key: string]: unknown;
 }
 
@@ -344,8 +352,7 @@ describe('Issue #44 Replication with Real Config Server Data', () => {
       // Verify critical fields survive roundtrip
       expect(roundtrip.configName).toBe('my-app');
       expect(roundtrip.configProfiles).toContain('prod');
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-      expect(Object.keys(roundtrip.propertySourceMap)).toHaveLength(3);
+      expect(Object.keys(roundtrip.propertySourceMap ?? {})).toHaveLength(3);
     }).not.toThrow();
   });
 });
