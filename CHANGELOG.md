@@ -1,3 +1,33 @@
+## 1.1.0 (2025-11-04)
+
+* fix: add value sanitization to prevent protobuf serialization errors (#54) ([2b7f29d](https://github.com/egulatee/pulumi-spring-cloud-config/commit/2b7f29d)), closes [#54](https://github.com/egulatee/pulumi-spring-cloud-config/issues/54) [#44](https://github.com/egulatee/pulumi-spring-cloud-config/issues/44) [#44](https://github.com/egulatee/pulumi-spring-cloud-config/issues/44) [#44](https://github.com/egulatee/pulumi-spring-cloud-config/issues/44) [#44](https://github.com/egulatee/pulumi-spring-cloud-config/issues/44)
+* test: add protobuf serialization tests for issue #44 (#53) ([07887cf](https://github.com/egulatee/pulumi-spring-cloud-config/commit/07887cf)), closes [#44](https://github.com/egulatee/pulumi-spring-cloud-config/issues/44) [#53](https://github.com/egulatee/pulumi-spring-cloud-config/issues/53) [#44](https://github.com/egulatee/pulumi-spring-cloud-config/issues/44) [#44](https://github.com/egulatee/pulumi-spring-cloud-config/issues/44) [#44](https://github.com/egulatee/pulumi-spring-cloud-config/issues/44) [#44](https://github.com/egulatee/pulumi-spring-cloud-config/issues/44)
+
+
+### BREAKING CHANGE
+
+* Non-primitive values are now converted to strings
+
+Implements value sanitization to fix issue #44. All non-primitive values
+from Spring Cloud Config Server are now converted to serializable primitives
+before being stored in Pulumi state.
+
+Changes:
+- Add sanitizeValue() function to convert non-primitives to primitives
+- Date objects → ISO 8601 strings
+- Buffer objects → Base64 strings
+- RegExp → String representation
+- Error → Error message
+- Functions → '[Function]' marker
+- Arrays → JSON strings
+- Complex objects → JSON strings
+- NaN/Infinity → null
+
+Testing:
+- Add comprehensive value-sanitization.test.ts with 15 test cases
+- All conversion scenarios covered
+- Protobuf compatibility verified
+
 ## <small>1.0.1 (2025-11-04)</small>
 
 * fix: add diagnostic logging for serialization troubleshooting (#52) ([a00fab9](https://github.com/egulatee/pulumi-spring-cloud-config/commit/a00fab9)), closes [#52](https://github.com/egulatee/pulumi-spring-cloud-config/issues/52) [#44](https://github.com/egulatee/pulumi-spring-cloud-config/issues/44) [#44](https://github.com/egulatee/pulumi-spring-cloud-config/issues/44)
