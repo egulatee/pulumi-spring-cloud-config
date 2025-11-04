@@ -300,7 +300,7 @@ describe('ConfigServerConfig - Backward Compatibility (Issue #56)', () => {
         label: 'main',
         username: 'admin',
         password: 'pass123',
-        propertySources: ['file', 'git'],
+        propertySources: ['vault'],
         timeout: 5000,
         debug: true,
         autoDetectSecrets: true,
