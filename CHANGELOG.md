@@ -1,3 +1,7 @@
+## 1.2.0 (2025-11-04)
+
+* feat: add source-based secret detection for Vault properties (#57) ([33987e7](https://github.com/egulatee/pulumi-spring-cloud-config/commit/33987e7)), closes [#57](https://github.com/egulatee/pulumi-spring-cloud-config/issues/57) [#56](https://github.com/egulatee/pulumi-spring-cloud-config/issues/56) [#56](https://github.com/egulatee/pulumi-spring-cloud-config/issues/56) [#57](https://github.com/egulatee/pulumi-spring-cloud-config/issues/57) [#57](https://github.com/egulatee/pulumi-spring-cloud-config/issues/57)
+
 ## 1.1.0 (2025-11-04)
 
 * fix: add value sanitization to prevent protobuf serialization errors (#54) ([2b7f29d](https://github.com/egulatee/pulumi-spring-cloud-config/commit/2b7f29d)), closes [#54](https://github.com/egulatee/pulumi-spring-cloud-config/issues/54) [#44](https://github.com/egulatee/pulumi-spring-cloud-config/issues/44) [#44](https://github.com/egulatee/pulumi-spring-cloud-config/issues/44) [#44](https://github.com/egulatee/pulumi-spring-cloud-config/issues/44) [#44](https://github.com/egulatee/pulumi-spring-cloud-config/issues/44)

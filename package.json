@@ -1,6 +1,6 @@
 {
   "name": "@egulatee/pulumi-spring-cloud-config",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Pulumi Dynamic Provider for integrating Spring Cloud Config Server with infrastructure-as-code projects",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
