@@ -178,49 +178,278 @@ If your commit message doesn't follow the convention, the commit will be rejecte
 
 ### Test Structure
 
-- Unit tests: `tests/*.test.ts`
-- Integration tests: `tests/integration/*.test.ts` (Phase 2)
-- Test coverage requirement: >= 80%
+The test suite is organized by functional concern for better maintainability:
 
-### Writing Tests
+```
+tests/
+├── fixtures/                     # Shared mock data
+│   └── config-server-responses.ts
+├── helpers/                      # Reusable test utilities
+│   └── index.ts
+├── client/                       # Client tests split by feature
+│   ├── basic.test.ts
+│   ├── auth.test.ts
+│   ├── retry.test.ts
+│   └── edge-cases.test.ts
+├── provider/                     # Provider tests split by feature
+│   ├── lifecycle.test.ts
+│   ├── filtering.test.ts
+│   └── validation.test.ts
+├── resource/                     # Resource tests split by feature
+│   ├── basic.test.ts
+│   ├── getProperty.test.ts
+│   ├── security.test.ts
+│   └── edge-cases.test.ts
+└── integration/                  # End-to-end integration tests
+    └── end-to-end.test.ts
+```
+
+**Test Coverage Requirements:**
+- Overall coverage: >= 80% (lines, branches, functions, statements)
+- Current coverage: ~90%+ (maintained across all metrics)
+- All new features must include tests
+
+### Using Test Fixtures
+
+Fixtures provide consistent, reusable mock data. Always prefer using fixtures over inline data:
 
 ```typescript
-import { ConfigServerClient } from '../src/client';
-import nock from 'nock';
+import {
+  smallConfigResponse,
+  multiSourceResponse,
+  responseWithSecrets,
+  largeConfigResponse,
+} from '../fixtures/config-server-responses';
+import { mockNock } from '../helpers';
 
-describe('ConfigServerClient', () => {
-  it('should fetch configuration successfully', async () => {
-    // Mock HTTP request
-    nock('https://config-server.example.com')
-      .get('/my-app/prod')
-      .reply(200, {
-        name: 'my-app',
-        profiles: ['prod'],
-        propertySources: [
-          {
-            name: 'vault',
-            source: { 'database.password': 'secret' },
-          },
-        ],
-      });
+it('should handle multi-source configuration', async () => {
+  // Use fixture instead of inline data
+  mockNock('http://localhost:8888', '/my-app/dev', multiSourceResponse);
 
-    const client = new ConfigServerClient('https://config-server.example.com');
-    const config = await client.fetchConfig('my-app', 'prod');
+  const client = new ConfigServerClient('http://localhost:8888');
+  const config = await client.fetchConfig('my-app', 'dev');
 
-    expect(config.name).toBe('my-app');
-    expect(config.profiles).toContain('prod');
+  expect(config.propertySources).toHaveLength(3);
+});
+```
+
+**Available Fixtures:**
+- `smallConfigResponse` - ~10 properties, quick tests
+- `mediumConfigResponse` - ~100 properties, realistic scenarios
+- `largeConfigResponse` - ~1,000 properties, performance tests
+- `extraLargeConfigResponse` - ~10,000 properties, stress tests
+- `vaultOnlyResponse` - Single Vault source
+- `gitOnlyResponse` - Single Git source
+- `multiSourceResponse` - Multiple sources (Vault + Git + File)
+- `responseWithSecrets` - Contains all secret patterns
+- `responseWithoutSecrets` - No secrets (public config)
+- `mixedSecurityResponse` - Mix of secrets and public config
+
+### Using Test Helpers
+
+Helper functions reduce boilerplate and ensure consistent test setup:
+
+```typescript
+import {
+  createMockClient,
+  createMockConfigResponse,
+  mockNock,
+  mockNockNetworkError,
+  waitForOutput,
+  clearAllMocks,
+} from '../helpers';
+
+describe('My Test Suite', () => {
+  afterEach(() => {
+    clearAllMocks(); // Clean up HTTP mocks after each test
+  });
+
+  it('should create client with default options', () => {
+    const client = createMockClient({
+      url: 'http://localhost:8888',
+      username: 'user',
+      password: 'pass',
+    });
+    expect(client).toBeDefined();
+  });
+
+  it('should build custom responses', () => {
+    const response = createMockConfigResponse({
+      name: 'my-app',
+      profiles: ['prod'],
+      sources: [{
+        name: 'vault:secret/my-app',
+        source: { 'db.password': 'secret' }
+      }]
+    });
+    expect(response.name).toBe('my-app');
+  });
+
+  it('should mock network errors', async () => {
+    mockNockNetworkError('http://localhost:8888', '/my-app/dev', 'ECONNREFUSED');
+
+    const client = createMockClient();
+    await expect(
+      client.fetchConfig('my-app', 'dev')
+    ).rejects.toThrow('ECONNREFUSED');
   });
 });
 ```
 
-### Running Specific Tests
+### Testing Pulumi Outputs
+
+Pulumi Outputs are asynchronous and require special handling. Use the `waitForOutput` helper:
+
+```typescript
+import * as pulumi from '@pulumi/pulumi';
+import { ConfigServerConfig } from '../src/resource';
+import { waitForOutput } from './helpers';
+
+it('should retrieve properties from Pulumi Output', async () => {
+  const resource = new ConfigServerConfig('test', {
+    configServerUrl: 'http://localhost:8888',
+    application: 'my-app',
+    profile: 'dev',
+  });
+
+  // ❌ WRONG: Can't access Output values directly
+  // expect(resource.properties['key']).toBe('value');
+
+  // ✅ CORRECT: Use waitForOutput to unwrap
+  const properties = await waitForOutput(resource.properties);
+  expect(properties['spring.application.name']).toBe('my-app');
+
+  // Can also use with secret outputs
+  const secrets = await waitForOutput(resource.getAllSecrets());
+  expect(secrets['database.password']).toBeDefined();
+});
+```
+
+### Security Testing Patterns
+
+Always test that sensitive data is handled correctly:
+
+```typescript
+import {
+  expectNoCredentialsInError,
+  filterSecrets,
+  isSecretKey,
+} from '../helpers';
+
+it('should sanitize credentials from error messages', async () => {
+  mockNockNetworkError(
+    'http://user:password@localhost:8888',
+    '/my-app/dev',
+    'ECONNREFUSED'
+  );
+
+  const client = new ConfigServerClient(
+    'http://user:password@localhost:8888'
+  );
+
+  try {
+    await client.fetchConfig('my-app', 'dev');
+  } catch (error) {
+    // Verify credentials are replaced with ***:***
+    expectNoCredentialsInError(
+      error as Error,
+      'http://user:password@localhost:8888'
+    );
+  }
+});
+
+it('should detect secret properties', () => {
+  const properties = {
+    'server.port': '8080',
+    'database.password': 'secret',
+    'api.key': 'key123',
+  };
+
+  const secrets = filterSecrets(properties);
+
+  // Should only include secret keys
+  expect(secrets).toEqual({
+    'database.password': 'secret',
+    'api.key': 'key123',
+  });
+
+  // server.port should not be included
+  expect(secrets['server.port']).toBeUndefined();
+});
+
+it('should identify secret patterns', () => {
+  expect(isSecretKey('database.password')).toBe(true);
+  expect(isSecretKey('oauth.secret')).toBe(true);
+  expect(isSecretKey('auth.token')).toBe(true);
+  expect(isSecretKey('encryption.key')).toBe(true);
+  expect(isSecretKey('api_key')).toBe(true);
+
+  expect(isSecretKey('server.port')).toBe(false);
+  expect(isSecretKey('app.name')).toBe(false);
+});
+```
+
+### Writing Integration Tests
+
+Integration tests verify all components work together. Place them in `tests/integration/`:
+
+```typescript
+import { ConfigServerConfig } from '../../src/resource';
+import { ConfigServerProvider } from '../../src/provider';
+import { waitForOutput } from '../helpers';
+import { multiSourceResponse } from '../fixtures/config-server-responses';
+
+it('should complete full create → update → read flow', async () => {
+  const provider = new ConfigServerProvider();
+
+  // CREATE
+  const createResult = await provider.create({
+    configServerUrl: 'http://localhost:8888',
+    application: 'my-app',
+    profile: 'dev',
+  });
+
+  expect(createResult.id).toBeDefined();
+  expect(createResult.outs.properties).toBeDefined();
+
+  // UPDATE
+  const updateResult = await provider.update(
+    createResult.id,
+    createResult.outs,
+    {
+      configServerUrl: 'http://localhost:8888',
+      application: 'my-app',
+      profile: 'prod', // Changed profile
+    }
+  );
+
+  expect(updateResult.outs.profile).toBe('prod');
+});
+```
+
+### Running Tests
 
 ```bash
+# Run all tests with coverage
+npm test
+
 # Run specific test file
-npm test -- client.test.ts
+npm test -- tests/client/basic.test.ts
 
 # Run tests matching pattern
 npm test -- --testNamePattern="should fetch"
+
+# Run only integration tests
+npm test -- tests/integration/
+
+# Run with verbose output
+npm test -- --verbose
+
+# Watch mode for development
+npm test -- --watch
+
+# Generate coverage report
+npm run test:coverage
 ```
 
 ## Code Style
