@@ -81,6 +81,112 @@ function logValueDetails(path: string, value: unknown, debug: boolean): void {
 }
 
 /**
+ * Sanitize a value to ensure it's Pulumi-serializable
+ *
+ * Converts non-primitive types to serializable primitives to prevent
+ * Pulumi's "Unexpected struct type" error during state serialization.
+ *
+ * @param value - Value to sanitize
+ * @param path - Property path (for logging)
+ * @returns Sanitized primitive value
+ *
+ * @remarks
+ * This function ensures all values stored in Pulumi state are JSON and
+ * protobuf-serializable primitives. Non-primitive types are converted as follows:
+ * - Date → ISO 8601 string
+ * - Buffer → Base64 string
+ * - RegExp → String representation
+ * - Error → Error message
+ * - Function → "[Function]" marker
+ * - Complex objects → JSON stringified
+ * - Arrays → Recursively sanitized
+ * - Plain objects → Recursively sanitized
+ */
+function sanitizeValue(value: unknown, path: string = 'value'): string | number | boolean | null {
+  // Handle null and undefined
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  // Primitives pass through unchanged
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number') {
+    // Ensure number is finite (not NaN, Infinity, -Infinity)
+    if (!Number.isFinite(value)) {
+      void pulumi.log.warn(
+        `[SANITIZATION] Non-finite number at ${path}: ${value}, converting to null`
+      );
+      return null;
+    }
+    return value;
+  }
+  if (typeof value === 'boolean') return value;
+
+  // Handle special object types that need conversion
+  if (value instanceof Date) {
+    const isoString = value.toISOString();
+    void pulumi.log.info(`[SANITIZATION] Converted Date to ISO string at ${path}: ${isoString}`);
+    return isoString;
+  }
+
+  if (Buffer.isBuffer(value)) {
+    const base64 = value.toString('base64');
+    void pulumi.log.info(
+      `[SANITIZATION] Converted Buffer to base64 at ${path} (${value.length} bytes)`
+    );
+    return base64;
+  }
+
+  if (value instanceof RegExp) {
+    const regexString = value.toString();
+    void pulumi.log.info(`[SANITIZATION] Converted RegExp to string at ${path}: ${regexString}`);
+    return regexString;
+  }
+
+  if (value instanceof Error) {
+    const errorMessage = value.message;
+    void pulumi.log.warn(`[SANITIZATION] Converted Error to message at ${path}: ${errorMessage}`);
+    return errorMessage;
+  }
+
+  if (typeof value === 'function') {
+    void pulumi.log.warn(`[SANITIZATION] Found function at ${path}, converting to marker string`);
+    return '[Function]';
+  }
+
+  // Handle arrays (not supported in current schema, but sanitize just in case)
+  if (Array.isArray(value)) {
+    void pulumi.log.warn(`[SANITIZATION] Found array at ${path}, converting to JSON string`);
+    return JSON.stringify(value);
+  }
+
+  // Handle plain objects (not supported in current schema, but sanitize just in case)
+  if (typeof value === 'object') {
+    void pulumi.log.warn(
+      `[SANITIZATION] Found complex object at ${path}, converting to JSON string`
+    );
+    try {
+      return JSON.stringify(value);
+    } catch (error) {
+      void pulumi.log.error(
+        `[SANITIZATION] Failed to stringify object at ${path}: ${error instanceof Error ? error.message : String(error)}`
+      );
+      return '[Object]';
+    }
+  }
+
+  // Fallback for any other types
+  const typeInfo = typeof value;
+  void pulumi.log.warn(`[SANITIZATION] Unknown type at ${path}: ${typeInfo}, converting to string`);
+  // Use JSON.stringify for better representation, fall back to String if that fails
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return `[${typeInfo}]`;
+  }
+}
+
+/**
  * Provider state stored by Pulumi
  *
  * @remarks
@@ -116,8 +222,8 @@ export interface ConfigServerProviderState {
   configLabel: string | null;
   configVersion: string | null;
   propertySourceNames: string[];
-  propertySourceMap: Record<string, Record<string, unknown>>;
-  properties: Record<string, unknown>;
+  propertySourceMap: Record<string, Record<string, string | number | boolean | null>>;
+  properties: Record<string, string | number | boolean | null>;
 }
 
 /**
@@ -204,44 +310,58 @@ export class ConfigServerProvider implements pulumi.dynamic.ResourceProvider {
     // 6. Flatten properties
     const properties = this.flattenProperties(filteredSources);
 
-    // 7. Build property source map (for serialization)
-    const propertySourceMap: Record<string, Record<string, unknown>> = {};
+    // 7. Build property source map (for serialization) with value sanitization
+    const propertySourceMap: Record<string, Record<string, string | number | boolean | null>> = {};
     const propertySourceNames: string[] = [];
 
     void pulumi.log.info('[DIAGNOSTIC] Analyzing property sources for serialization issues...');
 
     for (const source of filteredSources) {
       propertySourceNames.push(source.name);
-      propertySourceMap[source.name] = source.source;
+
+      // Sanitize all values in the source to ensure Pulumi compatibility
+      const sanitizedSource: Record<string, string | number | boolean | null> = {};
+      for (const [key, value] of Object.entries(source.source)) {
+        const path = `propertySourceMap.${source.name}.${key}`;
+
+        // Log original value details before sanitization
+        logValueDetails(path, value, inputs.debug as boolean);
+
+        // Sanitize the value to ensure it's a primitive
+        sanitizedSource[key] = sanitizeValue(value, path);
+      }
+
+      propertySourceMap[source.name] = sanitizedSource;
 
       // Log each property in this source
       void pulumi.log.info(
         `[DIAGNOSTIC] Property source: ${source.name} (${Object.keys(source.source).length} properties)`
       );
-
-      for (const [key, value] of Object.entries(source.source)) {
-        const path = `propertySourceMap.${source.name}.${key}`;
-        logValueDetails(path, value, inputs.debug as boolean);
-      }
     }
 
-    // 8. Analyze flattened properties
+    // 8. Analyze and sanitize flattened properties
     void pulumi.log.info(
       `[DIAGNOSTIC] Analyzing flattened properties (${Object.keys(properties).length} total)...`
     );
 
+    const sanitizedProperties: Record<string, string | number | boolean | null> = {};
     for (const [key, value] of Object.entries(properties)) {
       const path = `properties.${key}`;
+
+      // Log original value details before sanitization
       logValueDetails(path, value, inputs.debug as boolean);
+
+      // Sanitize the value to ensure it's a primitive
+      sanitizedProperties[key] = sanitizeValue(value, path);
     }
 
     // 9. Log success
     const duration = Date.now() - startTime;
     void pulumi.log.info(
-      `Successfully fetched ${Object.keys(properties).length} properties in ${duration}ms`
+      `Successfully fetched ${Object.keys(sanitizedProperties).length} properties in ${duration}ms`
     );
 
-    // 10. Build state with serializable fields
+    // 10. Build state with serializable fields (all values sanitized to primitives)
     const state: ConfigServerProviderState = {
       configServerUrl: inputs.configServerUrl as string,
       application: inputs.application as string,
@@ -254,14 +374,14 @@ export class ConfigServerProvider implements pulumi.dynamic.ResourceProvider {
       debug: inputs.debug as boolean | undefined,
       autoDetectSecrets: inputs.autoDetectSecrets !== false, // default: true
       enforceHttps: inputs.enforceHttps as boolean | undefined,
-      // Serialization-friendly config data
+      // Serialization-friendly config data (all values sanitized to primitives)
       configName: config.name,
       configProfiles: config.profiles,
       configLabel: config.label,
       configVersion: config.version,
       propertySourceNames,
-      propertySourceMap,
-      properties,
+      propertySourceMap, // Sanitized values only
+      properties: sanitizedProperties, // Sanitized values only
     };
 
     // 11. Final diagnostic check: Attempt JSON serialization
