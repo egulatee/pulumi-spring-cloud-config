@@ -499,7 +499,7 @@ export class ConfigServerProvider implements pulumi.dynamic.ResourceProvider {
    *
    * Based on Issue #7 Decision #1 (updated to keep smart diffing per user preference)
    */
-  diff(
+  async diff(
     _id: pulumi.ID,
     olds: ConfigServerProviderState,
     news: ConfigServerConfigArgs
@@ -518,11 +518,62 @@ export class ConfigServerProvider implements pulumi.dynamic.ResourceProvider {
       olds.autoDetectSecrets !== (news.autoDetectSecrets !== false) ||
       olds.enforceHttps !== news.enforceHttps;
 
-    return Promise.resolve({
-      changes: inputsChanged,
-      replaces: [],
-      stables: [],
-    });
+    // If inputs changed, return immediately
+    if (inputsChanged) {
+      return {
+        changes: true,
+        replaces: [],
+        stables: [],
+      };
+    }
+
+    // Check for server-side configuration changes by fetching current config
+    try {
+      const client = new ConfigServerClient(
+        news.configServerUrl as string,
+        news.username as string | undefined,
+        news.password as string | undefined,
+        news.timeout as number | undefined,
+        news.debug as boolean | undefined
+      );
+
+      const config = await client.fetchConfigWithRetry(
+        news.application as string,
+        news.profile as string,
+        news.label as string | undefined,
+        {
+          maxRetries: 3,
+          retryDelay: 1000,
+          backoffMultiplier: 2,
+        }
+      );
+
+      // Filter and flatten properties to compare with old state
+      const filteredSources = this.filterPropertySources(
+        config.propertySources,
+        news.propertySources as string[] | undefined
+      );
+      const newProperties = this.flattenProperties(filteredSources);
+
+      // Compare flattened properties
+      const propertiesChanged = JSON.stringify(olds.properties) !== JSON.stringify(newProperties);
+
+      return {
+        changes: propertiesChanged,
+        replaces: [],
+        stables: [],
+      };
+    } catch (error) {
+      // If we can't fetch config for comparison, assume no changes
+      void pulumi.log.warn(
+        `Could not fetch config for diff comparison: ${error instanceof Error ? error.message : String(error)}`
+      );
+      return {
+        changes: false,
+        replaces: [],
+        stables: [],
+      };
+    }
   }
 
   /**
@@ -647,14 +698,14 @@ export class ConfigServerProvider implements pulumi.dynamic.ResourceProvider {
    * @returns Flattened properties
    *
    * @remarks
-   * Later sources override earlier ones (Spring Cloud Config behavior).
-   * Property sources are processed in order.
+   * Spring Cloud Config returns sources with FIRST source having highest priority.
+   * We reverse the array so that later Object.assign calls override earlier ones correctly.
    */
   private flattenProperties(propertySources: PropertySource[]): Record<string, unknown> {
     const flattened: Record<string, unknown> = {};
 
-    // Process in order - later sources override earlier ones
-    for (const source of propertySources) {
+    // Reverse array so first source (highest priority) is processed last and wins
+    for (const source of [...propertySources].reverse()) {
       Object.assign(flattened, source.source);
     }
 

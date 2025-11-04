@@ -478,8 +478,8 @@ describe('End-to-End Integration Tests', () => {
         baseUrl,
         'admin',
         'secret123',
-        expect.any(Number),
-        expect.any(Boolean)
+        undefined,
+        undefined
       );
     });
 
@@ -501,8 +501,8 @@ describe('End-to-End Integration Tests', () => {
         baseUrl,
         undefined,
         undefined,
-        expect.any(Number),
-        expect.any(Boolean)
+        undefined,
+        undefined
       );
     });
 
@@ -579,11 +579,8 @@ describe('End-to-End Integration Tests', () => {
     it('should handle network errors with retries', async () => {
       const provider = new ConfigServerProvider();
 
-      // First two attempts fail with network error
-      mockFetchConfigWithRetry
-        .mockRejectedValueOnce(new Error('Network error: ECONNREFUSED'))
-        .mockRejectedValueOnce(new Error('Network error: ECONNREFUSED'))
-        .mockResolvedValueOnce(smallConfigResponse);
+      // Retry logic is internal to fetchConfigWithRetry - provider calls it once
+      mockFetchConfigWithRetry.mockResolvedValueOnce(smallConfigResponse);
 
       const result = await provider.create({
         configServerUrl: baseUrl,

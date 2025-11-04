@@ -240,9 +240,11 @@ export class ConfigServerConfig extends pulumi.dynamic.Resource {
           return result;
         }
 
-        // Filter source names if specified
+        // Filter source names if specified (case-insensitive)
         const filteredNames = sourceNames
-          ? names.filter((name) => sourceNames.some((filter) => name.includes(filter)))
+          ? names.filter((name) =>
+              sourceNames.some((filter) => name.toLowerCase().includes(filter.toLowerCase()))
+            )
           : names;
 
         // Merge properties from filtered sources in order
