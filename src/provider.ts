@@ -295,6 +295,19 @@ export class ConfigServerProvider implements pulumi.dynamic.ResourceProvider {
       }
     );
 
+    // 4.5. Log raw config response for debugging (helps diagnose serialization issues)
+    if (inputs.debug) {
+      try {
+        const rawJson = JSON.stringify(config, null, 2);
+        void pulumi.log.debug('[DIAGNOSTIC] Raw config server response:');
+        void pulumi.log.debug(rawJson);
+      } catch (error) {
+        void pulumi.log.warn(
+          `[DIAGNOSTIC] Could not stringify config response: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    }
+
     // 5. Filter property sources (if specified)
     const filteredSources = this.filterPropertySources(
       config.propertySources,
