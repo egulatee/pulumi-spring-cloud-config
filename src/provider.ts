@@ -430,9 +430,22 @@ export class ConfigServerProvider implements pulumi.dynamic.ResourceProvider {
       void pulumi.log.error(`[DIAGNOSTIC] State structure: ${JSON.stringify(Object.keys(state))}`);
     }
 
+    // 12. Remove undefined values (protobuf cannot serialize undefined)
+    // Root cause of issue #44: Pulumi's gRPC layer uses google.protobuf.Struct
+    // which only supports: null, number, string, boolean, array, object
+    // Optional input parameters (label, username, password, etc.) may be undefined
+    // when not provided by the user. Protobuf throws "Unexpected struct type" error
+    // when encountering undefined values. We must filter them out before returning.
+    const cleanedState: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(state)) {
+      if (value !== undefined) {
+        cleanedState[key] = value;
+      }
+    }
+
     return {
       id: `${state.application}-${state.profile}${state.label ? `-${state.label}` : ''}`,
-      outs: state,
+      outs: cleanedState as unknown as ConfigServerProviderState,
     };
   }
 

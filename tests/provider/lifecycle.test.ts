@@ -198,9 +198,15 @@ describe('ConfigServerProvider - Lifecycle', () => {
       configVersion: smallConfigResponse.version,
       propertySourceNames: ['vault:secret/application/dev'],
       propertySourceMap: {
-        'vault:secret/application/dev': smallConfigResponse.propertySources[0].source,
+        'vault:secret/application/dev': smallConfigResponse.propertySources[0].source as Record<
+          string,
+          string | number | boolean | null
+        >,
       },
-      properties: smallConfigResponse.propertySources[0].source,
+      properties: smallConfigResponse.propertySources[0].source as Record<
+        string,
+        string | number | boolean | null
+      >,
     };
 
     it('should detect application name change', async () => {
@@ -280,9 +286,12 @@ describe('ConfigServerProvider - Lifecycle', () => {
         configVersion: smallConfigResponse.version,
         propertySourceNames: ['vault:secret/application/dev'],
         propertySourceMap: {
-          'vault:secret/application/dev': smallConfigResponse.propertySources[0].source,
+          'vault:secret/application/dev': smallConfigResponse.propertySources[0].source as Record<
+            string,
+            string | number | boolean | null
+          >,
         },
-        properties: {},
+        properties: {} as Record<string, string | number | boolean | null>,
       };
 
       const newInputs = {
@@ -310,9 +319,12 @@ describe('ConfigServerProvider - Lifecycle', () => {
         configVersion: smallConfigResponse.version,
         propertySourceNames: ['vault:secret/application/dev'],
         propertySourceMap: {
-          'vault:secret/application/dev': smallConfigResponse.propertySources[0].source,
+          'vault:secret/application/dev': smallConfigResponse.propertySources[0].source as Record<
+            string,
+            string | number | boolean | null
+          >,
         },
-        properties: {},
+        properties: {} as Record<string, string | number | boolean | null>,
       };
 
       const newInputs = {
@@ -341,9 +353,12 @@ describe('ConfigServerProvider - Lifecycle', () => {
         configVersion: smallConfigResponse.version,
         propertySourceNames: ['vault:secret/application/dev'],
         propertySourceMap: {
-          'vault:secret/application/dev': smallConfigResponse.propertySources[0].source,
+          'vault:secret/application/dev': smallConfigResponse.propertySources[0].source as Record<
+            string,
+            string | number | boolean | null
+          >,
         },
-        properties: {},
+        properties: {} as Record<string, string | number | boolean | null>,
       };
 
       const newInputs = {

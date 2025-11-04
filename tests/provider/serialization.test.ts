@@ -267,8 +267,12 @@ describe('Provider Serialization', () => {
       expect(typeof deserialized.propertySourceMap).toBe('object');
       expect(typeof deserialized.properties).toBe('object');
 
-      // Verify we can access the complex value
-      expect(deserialized.propertySourceMap['source1']['key2']).toEqual({ nested: 'object' });
+      // Verify the complex value was sanitized to a JSON string
+      expect(deserialized.propertySourceMap['source1']['key2']).toBe('{"nested":"object"}');
+      // Verify it can be parsed back to the original structure
+      expect(JSON.parse(deserialized.propertySourceMap['source1']['key2'] as string)).toEqual({
+        nested: 'object',
+      });
     });
 
     it('should handle filtered property sources correctly', async () => {
@@ -524,7 +528,14 @@ describe('Provider Serialization', () => {
           enforceHttps: false,
         });
 
-        expect(result.outs.properties.arrayValue).toEqual(['item1', 'item2', 'item3']);
+        // Arrays are sanitized to JSON strings
+        expect(result.outs.properties.arrayValue).toBe('["item1","item2","item3"]');
+        // Verify it can be parsed back
+        expect(JSON.parse(result.outs.properties.arrayValue as string)).toEqual([
+          'item1',
+          'item2',
+          'item3',
+        ]);
       });
     });
 
@@ -620,8 +631,9 @@ describe('Provider Serialization', () => {
           enforceHttps: false,
         });
 
-        expect(result.outs.properties.serializableArray).toEqual(['a', 'b', 'c']);
-        expect(result.outs.properties.mixedArray).toEqual([1, 'two', true, null]);
+        // Arrays are sanitized to JSON strings
+        expect(result.outs.properties.serializableArray).toBe('["a","b","c"]');
+        expect(result.outs.properties.mixedArray).toBe('[1,"two",true,null]');
       });
 
       it('should detect non-serializable arrays with functions', async () => {
@@ -742,7 +754,10 @@ describe('Provider Serialization', () => {
           enforceHttps: false,
         });
 
-        expect(result.outs.properties.plainObject).toEqual({
+        // Objects are sanitized to JSON strings
+        expect(result.outs.properties.plainObject).toBe('{"nested":{"deep":"value"}}');
+        // Verify it can be parsed back
+        expect(JSON.parse(result.outs.properties.plainObject as string)).toEqual({
           nested: {
             deep: 'value',
           },
