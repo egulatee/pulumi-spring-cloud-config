@@ -82,7 +82,7 @@ describe('ConfigServerConfig - getSourceProperties()', () => {
 
     const unwrapped = await waitForOutput(props);
     expect(unwrapped).toBeDefined();
-    expect(unwrapped['spring.application.name']).toBe('test-application');
+    expect(unwrapped['spring.application.name']).toBe('my-app');
     expect(unwrapped['server.port']).toBe('8080');
   });
 

@@ -216,6 +216,7 @@ export interface ConfigServerProviderState {
   debug?: boolean;
   autoDetectSecrets?: boolean;
   enforceHttps?: boolean;
+  secretSources?: string[];
   // Serialization-friendly config data
   configName: string;
   configProfiles: string[];
@@ -223,6 +224,7 @@ export interface ConfigServerProviderState {
   configVersion: string | null;
   propertySourceNames: string[];
   propertySourceMap: Record<string, Record<string, string | number | boolean | null>>;
+  propertyToSourcesMap?: Record<string, string[]>;
   properties: Record<string, string | number | boolean | null>;
 }
 
@@ -368,13 +370,44 @@ export class ConfigServerProvider implements pulumi.dynamic.ResourceProvider {
       sanitizedProperties[key] = sanitizeValue(value, path);
     }
 
-    // 9. Log success
+    // 9. Build property-to-sources reverse lookup map
+    // This maps each property key to ALL sources that provided it (for "any source triggers secret" logic)
+    const propertyToSourcesMap: Record<string, string[]> = {};
+
+    for (const source of filteredSources) {
+      for (const key of Object.keys(source.source)) {
+        if (!propertyToSourcesMap[key]) {
+          propertyToSourcesMap[key] = [];
+        }
+        // Track all sources that provided this property (not just the last one)
+        propertyToSourcesMap[key].push(source.name);
+      }
+    }
+
+    if (inputs.debug) {
+      void pulumi.log.debug(
+        `[DIAGNOSTIC] Built property-to-sources map for ${Object.keys(propertyToSourcesMap).length} properties`
+      );
+
+      // Log properties that appeared in multiple sources
+      const multiSourceProps = Object.entries(propertyToSourcesMap)
+        .filter(([, sources]) => sources.length > 1)
+        .map(([key, sources]) => `${key} (${sources.length} sources)`);
+
+      if (multiSourceProps.length > 0) {
+        void pulumi.log.debug(
+          `[DIAGNOSTIC] Properties from multiple sources: ${multiSourceProps.join(', ')}`
+        );
+      }
+    }
+
+    // 10. Log success
     const duration = Date.now() - startTime;
     void pulumi.log.info(
       `Successfully fetched ${Object.keys(sanitizedProperties).length} properties in ${duration}ms`
     );
 
-    // 10. Build state with serializable fields (all values sanitized to primitives)
+    // 11. Build state with serializable fields (all values sanitized to primitives)
     const state: ConfigServerProviderState = {
       configServerUrl: inputs.configServerUrl as string,
       application: inputs.application as string,
@@ -387,6 +420,7 @@ export class ConfigServerProvider implements pulumi.dynamic.ResourceProvider {
       debug: inputs.debug as boolean | undefined,
       autoDetectSecrets: inputs.autoDetectSecrets !== false, // default: true
       enforceHttps: inputs.enforceHttps as boolean | undefined,
+      secretSources: inputs.secretSources as string[] | undefined,
       // Serialization-friendly config data (all values sanitized to primitives)
       configName: config.name,
       configProfiles: config.profiles,
@@ -394,6 +428,7 @@ export class ConfigServerProvider implements pulumi.dynamic.ResourceProvider {
       configVersion: config.version,
       propertySourceNames,
       propertySourceMap, // Sanitized values only
+      propertyToSourcesMap, // Reverse lookup for source-based secret detection
       properties: sanitizedProperties, // Sanitized values only
     };
 

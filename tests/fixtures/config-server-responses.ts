@@ -81,7 +81,8 @@ export const smallConfigResponse: ConfigServerResponse = {
     {
       name: 'vault:secret/application/dev',
       source: {
-        'spring.application.name': 'test-application',
+        'spring.application.name': 'my-app',
+        environment: 'development',
         'server.port': '8080',
         'spring.profiles.active': 'dev',
         'spring.datasource.url': 'jdbc:postgresql://localhost:5432/testdb',
@@ -336,6 +337,10 @@ export const responseWithSecrets: ConfigServerResponse = {
     {
       name: 'vault:secret/secure-app/prod',
       source: {
+        // Non-secret properties (for backward compatibility tests)
+        'spring.application.name': 'production-app',
+        environment: 'production',
+
         // Pattern: password
         'database.password': 'super-secret-password',
         'admin.password': 'admin-pass-123',
@@ -355,7 +360,7 @@ export const responseWithSecrets: ConfigServerResponse = {
         'encryption.key': 'encryption-key-value',
         'signing.key': 'signing-key-value',
         'private.key': 'private-key-pem',
-        'api.key': 'api-key-value',
+        'api.key': 'secret-api-key-123',
 
         // Pattern: credential
         'service.credential': 'service-credential-value',

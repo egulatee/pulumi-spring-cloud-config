@@ -82,7 +82,7 @@ describe('ConfigServerConfig - getProperty()', () => {
 
     // Should contain the actual value
     const unwrapped = await waitForOutput(value);
-    expect(unwrapped).toBe('test-application');
+    expect(unwrapped).toBe('my-app');
   });
 
   it('should get non-existent property and return Output<undefined>', async () => {

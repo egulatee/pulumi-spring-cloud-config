@@ -96,7 +96,7 @@ describe('ConfigServerConfig - getAllSecrets()', () => {
 
     // Should include properties ending in 'key'
     expect(secrets['encryption.key']).toBe('encryption-key-value');
-    expect(secrets['api.key']).toBe('api-key-value');
+    expect(secrets['api.key']).toBe('secret-api-key-123');
   });
 
   it('should return empty object when no secrets exist', async () => {
