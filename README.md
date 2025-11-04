@@ -325,6 +325,158 @@ For a detailed architecture diagram, see [docs/architecture.txt](./docs/architec
 4. Properties are available via `getProperty()` and `getSourceProperties()`
 5. Smart diffing ensures configuration is only re-fetched when inputs change
 
+## Property Source Priority
+
+### Understanding Override Behavior
+
+Spring Cloud Config Server returns configuration from multiple property sources (e.g., Git, Vault, local files). When the same property exists in multiple sources, **later sources override earlier ones**.
+
+This provider implements Spring Cloud Config's standard priority behavior, as documented in the [official Spring Cloud Config reference](https://docs.spring.io/spring-cloud-config/reference/server/environment-repository.html):
+
+> "Properties from property sources **later in the list** will override those **earlier in the list**."
+
+### How It Works
+
+When Spring Cloud Config Server returns a response with multiple property sources:
+
+```json
+{
+  "propertySources": [
+    {
+      "name": "file:application.properties",
+      "source": {
+        "database.host": "localhost",
+        "database.timeout": "30"
+      }
+    },
+    {
+      "name": "git:config-repo/app.yml",
+      "source": {
+        "database.host": "prod-db.example.com",
+        "database.pool": "50"
+      }
+    },
+    {
+      "name": "vault:secret/app/prod",
+      "source": {
+        "database.host": "secure-db.example.com",
+        "database.password": "encrypted-secret"
+      }
+    }
+  ]
+}
+```
+
+The provider flattens these sources in order, resulting in:
+
+```typescript
+{
+  "database.host": "secure-db.example.com",    // From Vault (last, highest priority)
+  "database.timeout": "30",                     // From file (not overridden)
+  "database.pool": "50",                        // From Git (not overridden)
+  "database.password": "encrypted-secret"       // From Vault (unique)
+}
+```
+
+### Priority Hierarchy (Typical Setup)
+
+In a typical Spring Cloud Config setup, sources are ordered by priority:
+
+1. **Classpath/File** (index 0) - Lowest priority, default values
+2. **Git Repository** (index 1) - Environment-specific configuration
+3. **HashiCorp Vault** (index 2) - Highest priority, secrets and overrides
+
+**Key Rule:** The **last source** (highest index) wins when properties conflict.
+
+### Practical Examples
+
+#### Example 1: Database Configuration
+
+```typescript
+import { ConfigServerConfig } from '@egulatee/pulumi-spring-cloud-config';
+
+const config = new ConfigServerConfig('app-config', {
+  configServerUrl: 'https://config-server.example.com',
+  application: 'my-app',
+  profile: 'prod',
+});
+
+// If 'database.host' exists in multiple sources:
+// - File source: "localhost" (development default)
+// - Git source: "prod-db.internal" (production value)
+// - Vault source: "secure-prod-db.internal" (secure override)
+//
+// Result: "secure-prod-db.internal" (Vault wins as last source)
+const dbHost = config.getProperty('database.host');
+```
+
+#### Example 2: Source-Specific Filtering
+
+When using `propertySources` filtering, priority still applies among filtered sources:
+
+```typescript
+const config = new ConfigServerConfig('vault-config', {
+  configServerUrl: 'https://config-server.example.com',
+  application: 'my-app',
+  profile: 'prod',
+  propertySources: ['vault', 'git'], // Only Vault and Git sources
+});
+
+// If both Vault and Git have 'api.key':
+// - Git source: "git-api-key"
+// - Vault source: "vault-api-key" (appears later in filtered array)
+//
+// Result: "vault-api-key" (Vault wins as last filtered source)
+const apiKey = config.getProperty('api.key');
+```
+
+#### Example 3: Unique Properties Preserved
+
+Properties that exist in only one source are always included:
+
+```typescript
+// Source 1 (file): { "app.timeout": "30", "app.name": "MyApp" }
+// Source 2 (git):  { "app.timeout": "60", "app.version": "2.0" }
+// Source 3 (vault): { "app.secret": "xyz123" }
+//
+// Flattened result:
+// {
+//   "app.timeout": "60",        // Git overrides file
+//   "app.name": "MyApp",        // From file (unique)
+//   "app.version": "2.0",       // From git (unique)
+//   "app.secret": "xyz123"      // From vault (unique)
+// }
+```
+
+### Important Notes
+
+**✅ DO:**
+- Expect later sources (e.g., Vault) to override earlier ones (e.g., files)
+- Use this behavior to set defaults in files and override with secure values in Vault
+- Rely on Spring Cloud Config's standard priority behavior
+
+**❌ DON'T:**
+- Assume the first source has highest priority (common misconception)
+- Expect property source order to be reversed or sorted by name
+- Depend on source order being different than what Spring Cloud Config returns
+
+### Verifying Priority Behavior
+
+You can verify which source a property came from using the config server's `/env` endpoint:
+
+```bash
+# View property sources and their order
+curl https://config-server.example.com/my-app/prod | jq '.propertySources'
+
+# The property sources array shows priority order (index 0 = lowest, last = highest)
+```
+
+### Reference
+
+For more information about Spring Cloud Config's property source behavior:
+- [Spring Cloud Config - Environment Repository](https://docs.spring.io/spring-cloud-config/reference/server/environment-repository.html)
+- [Spring Framework - PropertySource Abstraction](https://docs.spring.io/spring-framework/reference/core/beans/environment.html)
+
 ## Error Handling
 
 The provider handles various error scenarios gracefully:

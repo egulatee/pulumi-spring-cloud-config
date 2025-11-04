@@ -236,15 +236,22 @@ export const gitOnlyResponse: ConfigServerResponse = {
 };
 
 /**
- * Response with multiple property sources (Vault + Git + File).
+ * Response with multiple property sources (File, Git, Vault).
  * Tests property override behavior - later sources should override earlier ones.
+ *
+ * Property sources order (index 0 to 2):
+ * 1. File (index 0) - lowest priority
+ * 2. Git (index 1) - medium priority
+ * 3. Vault (index 2) - highest priority (last wins)
  *
  * @example
  * ```typescript
  * import { multiSourceResponse } from './fixtures/config-server-responses';
- * // Test that file source overrides git which overrides vault
+ * // Test that vault (last) overrides git which overrides file (first)
+ * // This follows Spring Cloud Config's "later sources override earlier ones" behavior
  * const flattened = flattenProperties(multiSourceResponse.propertySources);
- * expect(flattened['common.property']).toBe('from-file');
+ * expect(flattened['common.property']).toBe('from-vault');
+ * expect(flattened['override.test']).toBe('vault-value');
  * ```
  */
 export const multiSourceResponse: ConfigServerResponse = {

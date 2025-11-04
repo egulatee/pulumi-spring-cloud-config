@@ -275,9 +275,9 @@ describe('End-to-End Integration Tests', () => {
       expect(properties['git.specific']).toBe('git-value');
       expect(properties['vault.specific']).toBe('vault-value');
 
-      // Verify property override behavior (file overrides git overrides vault)
-      expect(properties['common.property']).toBe('from-file');
-      expect(properties['override.test']).toBe('file-wins');
+      // Verify property override behavior (vault overrides git overrides file - last wins)
+      expect(properties['common.property']).toBe('from-vault');
+      expect(properties['override.test']).toBe('vault-value');
     });
 
     it('should filter properties by source using getSourceProperties', async () => {
@@ -339,8 +339,8 @@ describe('End-to-End Integration Tests', () => {
 
       const properties = await waitForOutput(resource.properties);
 
-      // File source should win (highest priority)
-      expect(properties['priority.property']).toBe('from-file');
+      // Vault source should win (last = highest priority in Spring Cloud Config)
+      expect(properties['priority.property']).toBe('from-vault');
 
       // Source-specific properties should all be present
       expect(properties['file.only']).toBe('file-value');

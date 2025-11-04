@@ -694,18 +694,23 @@ export class ConfigServerProvider implements pulumi.dynamic.ResourceProvider {
   /**
    * Flatten property sources into a single key-value map
    *
-   * @param propertySources - Property sources to flatten
-   * @returns Flattened properties
+   * @param propertySources - Property sources to flatten (later sources have higher priority)
+   * @returns Flattened properties with correct override behavior
    *
    * @remarks
-   * Spring Cloud Config returns sources with FIRST source having highest priority.
-   * We reverse the array so that later Object.assign calls override earlier ones correctly.
+   * Spring Cloud Config returns sources where LATER sources override EARLIER ones.
+   * We process sources in order so that Object.assign applies later values over earlier ones.
+   *
+   * This follows Spring Cloud Config's standard behavior where "properties from property
+   * sources later in the list will override those earlier in the list."
+   *
+   * @see {@link https://docs.spring.io/spring-cloud-config/reference/server/environment-repository.html}
    */
   private flattenProperties(propertySources: PropertySource[]): Record<string, unknown> {
     const flattened: Record<string, unknown> = {};
 
-    // Reverse array so first source (highest priority) is processed last and wins
-    for (const source of [...propertySources].reverse()) {
+    // Process in order - later sources override earlier ones (Spring Cloud Config standard)
+    for (const source of propertySources) {
       Object.assign(flattened, source.source);
     }
 
