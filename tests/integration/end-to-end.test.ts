@@ -221,7 +221,6 @@ describe('End-to-End Integration Tests', () => {
       };
 
       const createResult = await provider.create(inputs);
-      const initialProperties = createResult.outs.properties;
 
       // Updated state with new property
       const updatedResponse: ConfigServerResponse = {
