@@ -11,6 +11,7 @@ Thank you for your interest in contributing! This document provides guidelines a
 - [Testing](#testing)
 - [Code Style](#code-style)
 - [Pull Request Process](#pull-request-process)
+- [Release Process](#release-process)
 
 ## Code of Conduct
 
@@ -624,6 +625,215 @@ rm -rf node_modules package-lock.json
 npm install
 npm run build
 ```
+
+## Release Process
+
+This project uses automated releases via [semantic-release](https://github.com/semantic-release/semantic-release). Version numbers follow [Semantic Versioning](https://semver.org/) and are formatted as `MAJOR.MINOR.PATCH`:
+
+- **MAJOR**: Breaking changes (incompatible API changes)
+- **MINOR**: New features (backwards-compatible)
+- **PATCH**: Bug fixes (backwards-compatible)
+
+### Automated Release Workflow
+
+Releases are fully automated through GitHub Actions and conventional commits:
+
+1. **Commit with Conventional Format**
+   ```bash
+   # Your commit message determines the release type
+   git commit -m "feat: add new configuration option"  # → Minor version bump
+   git commit -m "fix: resolve timeout issue"          # → Patch version bump
+   git commit -m "feat!: remove deprecated method"     # → Major version bump
+   ```
+
+2. **Push to Main Branch**
+   ```bash
+   git push origin main
+   # Or merge a pull request to main
+   ```
+
+3. **Automatic Release Steps** (handled by CI/CD)
+   - Analyze commit messages since last release
+   - Determine next version number based on conventional commits
+   - Generate/update CHANGELOG.md automatically
+   - Create GitHub release with release notes
+   - Publish package to NPM registry
+   - Create git tag for the release
+
+### Commit Types and Version Bumps
+
+| Commit Type | Example | Version Bump |
+|-------------|---------|--------------|
+| `fix:` | `fix: handle null values` | Patch (0.0.X) |
+| `feat:` | `feat: add OAuth support` | Minor (0.X.0) |
+| `BREAKING CHANGE:` or `feat!:` | `feat!: remove deprecated API` | Major (X.0.0) |
+| `docs:`, `chore:`, `style:`, etc. | `docs: update README` | None (no release) |
+
+### Breaking Changes
+
+To trigger a major version bump, use one of these formats:
+
+**Option 1: Breaking change footer**
+```bash
+git commit -m "feat: redesign configuration API
+
+BREAKING CHANGE: ConfigServerConfig constructor now requires options object instead of positional parameters"
+```
+
+**Option 2: Exclamation mark**
+```bash
+git commit -m "feat!: remove support for legacy authentication"
+```
+
+### Viewing Releases
+
+- **NPM Package**: https://www.npmjs.com/package/@egulatee/pulumi-spring-cloud-config
+- **GitHub Releases**: https://github.com/egulatee/pulumi-spring-cloud-config/releases
+- **CHANGELOG**: View [CHANGELOG.md](./CHANGELOG.md) for complete release history
+
+### Release Verification
+
+After automatic release completes:
+
+1. **Check NPM**:
+   ```bash
+   npm view @egulatee/pulumi-spring-cloud-config version
+   npm install @egulatee/pulumi-spring-cloud-config@latest
+   ```
+
+2. **Verify GitHub Release**:
+   - Visit: https://github.com/egulatee/pulumi-spring-cloud-config/releases
+   - Confirm release notes are accurate
+   - Verify tag was created
+
+3. **Test Installation**:
+   ```bash
+   mkdir test-install && cd test-install
+   npm init -y
+   npm install @egulatee/pulumi-spring-cloud-config@latest
+   ```
+
+### Troubleshooting Releases
+
+**Release Failed**:
+- Check GitHub Actions logs: https://github.com/egulatee/pulumi-spring-cloud-config/actions
+- Verify commit messages follow conventional format
+- Ensure NPM_TOKEN secret is configured and valid
+- Confirm all CI tests passed before release
+
+**Wrong Version Bumped**:
+- Review commit messages - they determine the version bump
+- Use `fix:` for patches, `feat:` for minor, `feat!:` or `BREAKING CHANGE:` for major
+- Cannot revert published NPM versions - publish a new corrected version
+
+### Manual Release (Emergency Only)
+
+Automated releases should always be preferred. For emergencies only:
+
+1. **Update Version Manually**:
+   ```bash
+   npm version [major|minor|patch]
+   ```
+
+2. **Create Git Tag**:
+   ```bash
+   git tag v1.2.3
+   git push origin v1.2.3
+   ```
+
+3. **Publish to NPM**:
+   ```bash
+   npm publish
+   ```
+
+4. **Create GitHub Release**:
+   - Go to: https://github.com/egulatee/pulumi-spring-cloud-config/releases/new
+   - Select the tag
+   - Add release notes manually
+   - Publish release
+
+### Rollback Procedures
+
+If critical issues are discovered after release:
+
+**For Minor Issues**: Publish a patch release immediately
+```bash
+# Fix the issue, commit, and push to main
+git commit -m "fix: resolve critical issue from v1.2.0"
+git push origin main
+# Automated release will create v1.2.1
+```
+
+**For Critical Issues**: Deprecate the problematic version
+```bash
+npm deprecate @egulatee/pulumi-spring-cloud-config@1.2.0 \
+  "Critical bug detected. Please upgrade to 1.2.1 or later."
+```
+
+**For Complete Failures** (within 72 hours only):
+```bash
+# Last resort - unpublish the version
+npm unpublish @egulatee/pulumi-spring-cloud-config@1.2.0
+```
+
+**Note**: NPM allows unpublishing only within 72 hours of publication. After that, deprecation is the only option.
+
+### Version Numbering Guidelines
+
+**PATCH (X.Y.Z+1)** - Bug fixes and non-breaking changes:
+- Bug fixes
+- Documentation updates
+- Dependency updates (non-breaking)
+- Performance improvements (non-breaking)
+- Code refactoring (no behavior changes)
+
+**MINOR (X.Y+1.0)** - New features, backwards-compatible:
+- New features
+- New configuration options (with backwards-compatible defaults)
+- Deprecation warnings (feature still works)
+- Internal refactoring with new capabilities
+
+**MAJOR (X+1.0.0)** - Breaking changes:
+- Breaking API changes
+- Removed deprecated features
+- Changed default behaviors
+- Minimum Node.js or Pulumi version changes
+- Required configuration changes
+
+### Pre-release Versions
+
+For testing before official release:
+
+```bash
+# Commit with conventional format
+git commit -m "feat: experimental feature"
+
+# Push to a pre-release branch (e.g., beta, alpha)
+git push origin beta
+
+# Semantic-release can be configured to publish pre-releases from specific branches
+# Example: beta branch → 1.2.0-beta.1
+```
+
+### Release Monitoring
+
+Monitor release health:
+
+1. **GitHub Actions**: Watch release workflow status
+2. **NPM Downloads**: Track at https://npm-stat.com/charts.html?package=@egulatee/pulumi-spring-cloud-config
+3. **GitHub Issues**: Monitor for bug reports after releases
+4. **Dependabot**: Review security alerts promptly
+
+### Best Practices
+
+- ✅ **Always use conventional commits** - They drive the release process
+- ✅ **Let automation handle releases** - Don't manually bump versions
+- ✅ **Test thoroughly before merging to main** - Main branch triggers releases
+- ✅ **Review CHANGELOG after release** - Ensure it accurately reflects changes
+- ✅ **Monitor first 48 hours after release** - Watch for issues
+- ❌ **Don't commit directly to main** - Use pull requests for review
+- ❌ **Don't manually edit CHANGELOG** - It's auto-generated
+- ❌ **Don't force-push to main** - It can break the release process
 
 ## Questions or Need Help?
 
