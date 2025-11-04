@@ -1,3 +1,10 @@
+## <small>1.0.1 (2025-11-04)</small>
+
+* fix: add diagnostic logging for serialization troubleshooting (#52) ([a00fab9](https://github.com/egulatee/pulumi-spring-cloud-config/commit/a00fab9)), closes [#52](https://github.com/egulatee/pulumi-spring-cloud-config/issues/52) [#44](https://github.com/egulatee/pulumi-spring-cloud-config/issues/44) [#44](https://github.com/egulatee/pulumi-spring-cloud-config/issues/44)
+* chore(deps-dev): Bump @commitlint/config-conventional (#10) ([eb4ed1b](https://github.com/egulatee/pulumi-spring-cloud-config/commit/eb4ed1b)), closes [#10](https://github.com/egulatee/pulumi-spring-cloud-config/issues/10)
+* chore(deps-dev): Bump jest and @types/jest (#13) ([5afdf1d](https://github.com/egulatee/pulumi-spring-cloud-config/commit/5afdf1d)), closes [#13](https://github.com/egulatee/pulumi-spring-cloud-config/issues/13)
+* docs: replace static version badge with dynamic npm badge (#51) ([ea15cd4](https://github.com/egulatee/pulumi-spring-cloud-config/commit/ea15cd4)), closes [#51](https://github.com/egulatee/pulumi-spring-cloud-config/issues/51) [#50](https://github.com/egulatee/pulumi-spring-cloud-config/issues/50)
+
 ## 1.0.0 (2025-11-03)
 
 * fix: commit package-lock.json for CI caching and reproducibility ([00746c5](https://github.com/egulatee/pulumi-spring-cloud-config/commit/00746c5)), closes [#8](https://github.com/egulatee/pulumi-spring-cloud-config/issues/8)
