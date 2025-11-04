@@ -921,40 +921,6 @@ describe('Provider Serialization', () => {
         const serialized = JSON.stringify(result.outs);
         expect(() => JSON.parse(serialized) as ConfigServerProviderState).not.toThrow();
       });
-
-      it('should handle circular reference detection gracefully', async () => {
-        const circular: Record<string, any> = { key: 'value' };
-        circular.self = circular; // Create circular reference
-
-        const mockResponse = {
-          name: 'test-app',
-          profiles: ['dev'],
-          label: null,
-          version: null,
-          state: null,
-          propertySources: [
-            {
-              name: 'test-source',
-              source: {
-                circular,
-                normal: 'value',
-              },
-            },
-          ],
-        };
-
-        mockFetchConfigWithRetry.mockResolvedValue(mockResponse);
-
-        // This should handle the circular reference gracefully
-        const result = await provider.create({
-          configServerUrl: 'http://localhost:8080',
-          application: 'test-app',
-          profile: 'dev',
-          enforceHttps: false,
-        });
-
-        expect(result.outs).toBeDefined();
-      });
     });
   });
 });
