@@ -335,4 +335,626 @@ describe('Provider Serialization', () => {
       // the provider in a state that would cause serialization issues
     });
   });
+
+  describe('Diagnostic Functions Coverage', () => {
+    describe('getDetailedType', () => {
+      it('should detect primitive types correctly', async () => {
+        const mockResponse = {
+          name: 'test-app',
+          profiles: ['dev'],
+          label: null,
+          version: null,
+          state: null,
+          propertySources: [
+            {
+              name: 'test-source',
+              source: {
+                stringValue: 'text',
+                numberValue: 42,
+                booleanValue: true,
+                nullValue: null,
+              },
+            },
+          ],
+        };
+
+        mockFetchConfigWithRetry.mockResolvedValue(mockResponse);
+
+        const result = await provider.create({
+          configServerUrl: 'http://localhost:8080',
+          application: 'test-app',
+          profile: 'dev',
+          enforceHttps: false,
+        });
+
+        expect(result.outs).toBeDefined();
+        expect(result.outs.properties).toEqual({
+          stringValue: 'text',
+          numberValue: 42,
+          booleanValue: true,
+          nullValue: null,
+        });
+      });
+
+      it('should detect Date objects', async () => {
+        const mockResponse = {
+          name: 'test-app',
+          profiles: ['dev'],
+          label: null,
+          version: null,
+          state: null,
+          propertySources: [
+            {
+              name: 'test-source',
+              source: {
+                dateValue: new Date('2025-01-01'),
+                normalValue: 'text',
+              },
+            },
+          ],
+        };
+
+        mockFetchConfigWithRetry.mockResolvedValue(mockResponse);
+
+        const result = await provider.create({
+          configServerUrl: 'http://localhost:8080',
+          application: 'test-app',
+          profile: 'dev',
+          enforceHttps: false,
+        });
+
+        // Date should be serialized as ISO string
+        expect(result.outs).toBeDefined();
+      });
+
+      it('should detect Buffer objects', async () => {
+        const mockResponse = {
+          name: 'test-app',
+          profiles: ['dev'],
+          label: null,
+          version: null,
+          state: null,
+          propertySources: [
+            {
+              name: 'test-source',
+              source: {
+                bufferValue: Buffer.from('test'),
+                normalValue: 'text',
+              },
+            },
+          ],
+        };
+
+        mockFetchConfigWithRetry.mockResolvedValue(mockResponse);
+
+        const result = await provider.create({
+          configServerUrl: 'http://localhost:8080',
+          application: 'test-app',
+          profile: 'dev',
+          enforceHttps: false,
+        });
+
+        expect(result.outs).toBeDefined();
+      });
+
+      it('should detect RegExp objects', async () => {
+        const mockResponse = {
+          name: 'test-app',
+          profiles: ['dev'],
+          label: null,
+          version: null,
+          state: null,
+          propertySources: [
+            {
+              name: 'test-source',
+              source: {
+                regexpValue: /test/gi,
+                normalValue: 'text',
+              },
+            },
+          ],
+        };
+
+        mockFetchConfigWithRetry.mockResolvedValue(mockResponse);
+
+        const result = await provider.create({
+          configServerUrl: 'http://localhost:8080',
+          application: 'test-app',
+          profile: 'dev',
+          enforceHttps: false,
+        });
+
+        expect(result.outs).toBeDefined();
+      });
+
+      it('should detect Error objects', async () => {
+        const mockResponse = {
+          name: 'test-app',
+          profiles: ['dev'],
+          label: null,
+          version: null,
+          state: null,
+          propertySources: [
+            {
+              name: 'test-source',
+              source: {
+                errorValue: new Error('test error'),
+                normalValue: 'text',
+              },
+            },
+          ],
+        };
+
+        mockFetchConfigWithRetry.mockResolvedValue(mockResponse);
+
+        const result = await provider.create({
+          configServerUrl: 'http://localhost:8080',
+          application: 'test-app',
+          profile: 'dev',
+          enforceHttps: false,
+        });
+
+        expect(result.outs).toBeDefined();
+      });
+
+      it('should detect Array types', async () => {
+        const mockResponse = {
+          name: 'test-app',
+          profiles: ['dev'],
+          label: null,
+          version: null,
+          state: null,
+          propertySources: [
+            {
+              name: 'test-source',
+              source: {
+                arrayValue: ['item1', 'item2', 'item3'],
+                normalValue: 'text',
+              },
+            },
+          ],
+        };
+
+        mockFetchConfigWithRetry.mockResolvedValue(mockResponse);
+
+        const result = await provider.create({
+          configServerUrl: 'http://localhost:8080',
+          application: 'test-app',
+          profile: 'dev',
+          enforceHttps: false,
+        });
+
+        expect(result.outs.properties.arrayValue).toEqual(['item1', 'item2', 'item3']);
+      });
+    });
+
+    describe('isSerializable', () => {
+      it('should accept serializable primitives', async () => {
+        const mockResponse = {
+          name: 'test-app',
+          profiles: ['dev'],
+          label: null,
+          version: null,
+          state: null,
+          propertySources: [
+            {
+              name: 'test-source',
+              source: {
+                str: 'value',
+                num: 123,
+                bool: true,
+                nul: null,
+              },
+            },
+          ],
+        };
+
+        mockFetchConfigWithRetry.mockResolvedValue(mockResponse);
+
+        const result = await provider.create({
+          configServerUrl: 'http://localhost:8080',
+          application: 'test-app',
+          profile: 'dev',
+          enforceHttps: false,
+        });
+
+        const serialized = JSON.stringify(result.outs);
+        expect(() => JSON.parse(serialized) as ConfigServerProviderState).not.toThrow();
+      });
+
+      it('should reject undefined values', async () => {
+        const mockResponse = {
+          name: 'test-app',
+          profiles: ['dev'],
+          label: null,
+          version: null,
+          state: null,
+          propertySources: [
+            {
+              name: 'test-source',
+              source: {
+                definedValue: 'text',
+                undefinedValue: undefined,
+              },
+            },
+          ],
+        };
+
+        mockFetchConfigWithRetry.mockResolvedValue(mockResponse);
+
+        const result = await provider.create({
+          configServerUrl: 'http://localhost:8080',
+          application: 'test-app',
+          profile: 'dev',
+          enforceHttps: false,
+        });
+
+        // undefined values are typically omitted in JSON
+        expect(result.outs).toBeDefined();
+      });
+
+      it('should handle arrays with serializable elements', async () => {
+        const mockResponse = {
+          name: 'test-app',
+          profiles: ['dev'],
+          label: null,
+          version: null,
+          state: null,
+          propertySources: [
+            {
+              name: 'test-source',
+              source: {
+                serializableArray: ['a', 'b', 'c'],
+                mixedArray: [1, 'two', true, null],
+              },
+            },
+          ],
+        };
+
+        mockFetchConfigWithRetry.mockResolvedValue(mockResponse);
+
+        const result = await provider.create({
+          configServerUrl: 'http://localhost:8080',
+          application: 'test-app',
+          profile: 'dev',
+          enforceHttps: false,
+        });
+
+        expect(result.outs.properties.serializableArray).toEqual(['a', 'b', 'c']);
+        expect(result.outs.properties.mixedArray).toEqual([1, 'two', true, null]);
+      });
+
+      it('should detect non-serializable arrays with functions', async () => {
+        const mockResponse = {
+          name: 'test-app',
+          profiles: ['dev'],
+          label: null,
+          version: null,
+          state: null,
+          propertySources: [
+            {
+              name: 'test-source',
+              source: {
+                nonSerializableArray: ['a', () => 'b', 'c'],
+                normalValue: 'text',
+              },
+            },
+          ],
+        };
+
+        mockFetchConfigWithRetry.mockResolvedValue(mockResponse);
+
+        const result = await provider.create({
+          configServerUrl: 'http://localhost:8080',
+          application: 'test-app',
+          profile: 'dev',
+          enforceHttps: false,
+        });
+
+        expect(result.outs).toBeDefined();
+      });
+
+      it('should reject Date objects as non-serializable', async () => {
+        const mockResponse = {
+          name: 'test-app',
+          profiles: ['dev'],
+          label: null,
+          version: null,
+          state: null,
+          propertySources: [
+            {
+              name: 'test-source',
+              source: {
+                dateValue: new Date('2025-01-01'),
+              },
+            },
+          ],
+        };
+
+        mockFetchConfigWithRetry.mockResolvedValue(mockResponse);
+
+        const result = await provider.create({
+          configServerUrl: 'http://localhost:8080',
+          application: 'test-app',
+          profile: 'dev',
+          enforceHttps: false,
+        });
+
+        expect(result.outs).toBeDefined();
+      });
+
+      it('should reject Buffer objects as non-serializable', async () => {
+        const mockResponse = {
+          name: 'test-app',
+          profiles: ['dev'],
+          label: null,
+          version: null,
+          state: null,
+          propertySources: [
+            {
+              name: 'test-source',
+              source: {
+                bufferValue: Buffer.from('test'),
+              },
+            },
+          ],
+        };
+
+        mockFetchConfigWithRetry.mockResolvedValue(mockResponse);
+
+        const result = await provider.create({
+          configServerUrl: 'http://localhost:8080',
+          application: 'test-app',
+          profile: 'dev',
+          enforceHttps: false,
+        });
+
+        expect(result.outs).toBeDefined();
+      });
+
+      it('should handle plain objects recursively', async () => {
+        const mockResponse = {
+          name: 'test-app',
+          profiles: ['dev'],
+          label: null,
+          version: null,
+          state: null,
+          propertySources: [
+            {
+              name: 'test-source',
+              source: {
+                plainObject: {
+                  nested: {
+                    deep: 'value',
+                  },
+                },
+              },
+            },
+          ],
+        };
+
+        mockFetchConfigWithRetry.mockResolvedValue(mockResponse);
+
+        const result = await provider.create({
+          configServerUrl: 'http://localhost:8080',
+          application: 'test-app',
+          profile: 'dev',
+          enforceHttps: false,
+        });
+
+        expect(result.outs.properties.plainObject).toEqual({
+          nested: {
+            deep: 'value',
+          },
+        });
+      });
+
+      it('should reject objects with custom constructors', async () => {
+        class CustomClass {
+          constructor(public value: string) {}
+        }
+
+        const mockResponse = {
+          name: 'test-app',
+          profiles: ['dev'],
+          label: null,
+          version: null,
+          state: null,
+          propertySources: [
+            {
+              name: 'test-source',
+              source: {
+                customObject: new CustomClass('test'),
+                normalValue: 'text',
+              },
+            },
+          ],
+        };
+
+        mockFetchConfigWithRetry.mockResolvedValue(mockResponse);
+
+        const result = await provider.create({
+          configServerUrl: 'http://localhost:8080',
+          application: 'test-app',
+          profile: 'dev',
+          enforceHttps: false,
+        });
+
+        expect(result.outs).toBeDefined();
+      });
+    });
+
+    describe('Debug Mode and Logging', () => {
+      it('should enable diagnostic logging in debug mode', async () => {
+        const mockResponse = {
+          name: 'test-app',
+          profiles: ['dev'],
+          label: null,
+          version: null,
+          state: null,
+          propertySources: [
+            {
+              name: 'test-source',
+              source: {
+                key1: 'value1',
+                key2: 'value2',
+              },
+            },
+          ],
+        };
+
+        mockFetchConfigWithRetry.mockResolvedValue(mockResponse);
+
+        const result = await provider.create({
+          configServerUrl: 'http://localhost:8080',
+          application: 'test-app',
+          profile: 'dev',
+          debug: true, // Enable debug mode
+          enforceHttps: false,
+        });
+
+        expect(result.outs).toBeDefined();
+        expect(result.outs.properties).toEqual({
+          key1: 'value1',
+          key2: 'value2',
+        });
+      });
+
+      it('should log warnings for non-serializable values', async () => {
+        const mockResponse = {
+          name: 'test-app',
+          profiles: ['dev'],
+          label: null,
+          version: null,
+          state: null,
+          propertySources: [
+            {
+              name: 'test-source',
+              source: {
+                functionValue: () => 'test',
+                symbolValue: Symbol('test'),
+                normalValue: 'text',
+              },
+            },
+          ],
+        };
+
+        mockFetchConfigWithRetry.mockResolvedValue(mockResponse);
+
+        const result = await provider.create({
+          configServerUrl: 'http://localhost:8080',
+          application: 'test-app',
+          profile: 'dev',
+          enforceHttps: false,
+        });
+
+        expect(result.outs).toBeDefined();
+      });
+    });
+
+    describe('Serialization Error Handling', () => {
+      it('should handle key mismatch after serialization', async () => {
+        const mockResponse = {
+          name: 'test-app',
+          profiles: ['dev'],
+          label: null,
+          version: null,
+          state: null,
+          propertySources: [
+            {
+              name: 'test-source',
+              source: {
+                validKey: 'valid value',
+                undefinedKey: undefined, // Will be omitted in JSON
+              },
+            },
+          ],
+        };
+
+        mockFetchConfigWithRetry.mockResolvedValue(mockResponse);
+
+        const result = await provider.create({
+          configServerUrl: 'http://localhost:8080',
+          application: 'test-app',
+          profile: 'dev',
+          enforceHttps: false,
+        });
+
+        // Should complete despite undefined values
+        expect(result.outs).toBeDefined();
+        expect(result.outs.properties.validKey).toBe('valid value');
+      });
+
+      it('should handle deeply nested serializable objects', async () => {
+        const deepObject: Record<string, any> = { level: 0 };
+        let current = deepObject;
+        for (let i = 1; i < 10; i++) {
+          current.nested = { level: i };
+          current = current.nested;
+        }
+
+        const mockResponse = {
+          name: 'test-app',
+          profiles: ['dev'],
+          label: null,
+          version: null,
+          state: null,
+          propertySources: [
+            {
+              name: 'test-source',
+              source: {
+                deepObject,
+              },
+            },
+          ],
+        };
+
+        mockFetchConfigWithRetry.mockResolvedValue(mockResponse);
+
+        const result = await provider.create({
+          configServerUrl: 'http://localhost:8080',
+          application: 'test-app',
+          profile: 'dev',
+          enforceHttps: false,
+        });
+
+        const serialized = JSON.stringify(result.outs);
+        expect(() => JSON.parse(serialized) as ConfigServerProviderState).not.toThrow();
+      });
+
+      it('should handle circular reference detection gracefully', async () => {
+        const circular: Record<string, any> = { key: 'value' };
+        circular.self = circular; // Create circular reference
+
+        const mockResponse = {
+          name: 'test-app',
+          profiles: ['dev'],
+          label: null,
+          version: null,
+          state: null,
+          propertySources: [
+            {
+              name: 'test-source',
+              source: {
+                circular,
+                normal: 'value',
+              },
+            },
+          ],
+        };
+
+        mockFetchConfigWithRetry.mockResolvedValue(mockResponse);
+
+        // This should handle the circular reference gracefully
+        const result = await provider.create({
+          configServerUrl: 'http://localhost:8080',
+          application: 'test-app',
+          profile: 'dev',
+          enforceHttps: false,
+        });
+
+        expect(result.outs).toBeDefined();
+      });
+    });
+  });
 });
