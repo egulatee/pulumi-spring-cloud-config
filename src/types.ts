@@ -63,6 +63,24 @@ export interface ConfigServerConfigArgs {
   autoDetectSecrets?: pulumi.Input<boolean>;
 
   /**
+   * Automatically mark ALL properties from specified sources as secrets.
+   * Source names are matched using case-insensitive substring matching.
+   * Works in combination with autoDetectSecrets (properties are secrets if EITHER condition is met).
+   *
+   * @example ["vault"] - Mark all Vault properties as secrets
+   * @example ["vault", "aws-secrets"] - Mark properties from multiple secret backends as secrets
+   * @default undefined - Disabled by default (backward compatible)
+   *
+   * @remarks
+   * - Enables "defense in depth" security by treating all Vault data as secrets
+   * - Uses substring matching: "vault" matches "vault:/secret/app", "vault-prod", etc.
+   * - If a property appears in ANY listed source, it will be marked as a secret
+   * - Combines with autoDetectSecrets: properties are secrets if from secret source OR match key patterns
+   * - Can be overridden per-property using explicit markAsSecret parameter in getProperty()
+   */
+  secretSources?: pulumi.Input<string[]>;
+
+  /**
    * Enforce HTTPS (fail on HTTP URLs except localhost) (default: false - warn only)
    */
   enforceHttps?: pulumi.Input<boolean>;
