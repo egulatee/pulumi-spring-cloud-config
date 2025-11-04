@@ -1,3 +1,7 @@
+## 1.3.0 (2025-11-04)
+
+* feat: migrate to ESLint 9 flat config format (#59) ([2d2ab1a](https://github.com/egulatee/pulumi-spring-cloud-config/commit/2d2ab1a)), closes [#59](https://github.com/egulatee/pulumi-spring-cloud-config/issues/59) [#58](https://github.com/egulatee/pulumi-spring-cloud-config/issues/58)
+
 ## 1.2.0 (2025-11-04)
 
 * feat: add source-based secret detection for Vault properties (#57) ([33987e7](https://github.com/egulatee/pulumi-spring-cloud-config/commit/33987e7)), closes [#57](https://github.com/egulatee/pulumi-spring-cloud-config/issues/57) [#56](https://github.com/egulatee/pulumi-spring-cloud-config/issues/56) [#56](https://github.com/egulatee/pulumi-spring-cloud-config/issues/56) [#57](https://github.com/egulatee/pulumi-spring-cloud-config/issues/57) [#57](https://github.com/egulatee/pulumi-spring-cloud-config/issues/57)
